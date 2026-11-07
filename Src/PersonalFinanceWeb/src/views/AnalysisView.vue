@@ -7,6 +7,7 @@ import Sheet from "../components/Sheet.vue";
 import ChartPanel from "../components/ChartPanel.vue";
 import JobProgress from "../components/JobProgress.vue";
 import TransactionList from "../components/TransactionList.vue";
+import NewAccountForm from "../components/NewAccountForm.vue";
 
 const api = inject("api");
 const tab = ref(state.route.parts[0] || "run");
@@ -40,12 +41,22 @@ async function analyse() {
 }
 async function jobDone(job) { toast(`Analysis ${job.status}`); status.value = await api.get(`${projectPath()}/analysis`); unmatchedKey.value += 1; }
 
+// A rule's account can be made on the spot (and its category with it).
+const addingAccount = ref(false);
+async function reloadProject() { project.value = await api.get(projectPath()); }
+async function accountAdded(account) {
+  accounts.value = (await api.get(`${projectPath()}/accounts`)).items;
+  ruleDraft.value.account = account.id;
+  addingAccount.value = false;
+}
+
 // Transactions no rule matched: each can start a rule, pre-filled with its beneficiary words.
 const unmatchedKey = ref(0);
 const unmatchedCount = computed(() => status.value?.accounts?.find((item) => item.id === "uncategorised")?.count || 0);
 const rulesChanged = ref(false);
 function ruleFromTransaction(tx) {
   const suggestion = tx.suggestedRule;
+  addingAccount.value = false;
   ruleDraft.value = { name: suggestion.name, account: accounts.value.find((account) => !account.builtIn)?.id, enabled: true, conditions: suggestion.conditions.map((condition) => ({ ...condition })), date: { start: "", end: "" }, amount: { min: "", max: "" }, example: suggestion.example };
   testResult.value = null;
   testRule();
@@ -54,8 +65,8 @@ function ruleFromTransaction(tx) {
 const accountName = (id) => accounts.value.find((account) => account.id === id)?.name || id;
 const accountSummary = computed(() => (status.value?.accounts || []).map((item) => ({ ...item, name: accountName(item.id) })).sort((a, b) => Math.abs(b.running) - Math.abs(a.running)));
 
-function newRule() { ruleDraft.value = { name: "", account: accounts.value.find((account) => !account.builtIn)?.id, enabled: true, conditions: [{ field: "description", op: "contains", value: "" }], date: { start: "", end: "" }, amount: { min: "", max: "" } }; testResult.value = null; }
-async function editRule(item) { const rule = await api.get(`${projectPath()}/rules/${item.id}`); ruleDraft.value = { ...rule, date: { start: rule.date.start || "", end: rule.date.end || "" }, amount: { min: rule.amount.min ?? "", max: rule.amount.max ?? "" }, conditions: rule.conditions.map((condition) => ({ ...condition, value: condition.values ? condition.values.join(", ") : condition.value })) }; testResult.value = null; }
+function newRule() { addingAccount.value = false; ruleDraft.value = { name: "", account: accounts.value.find((account) => !account.builtIn)?.id, enabled: true, conditions: [{ field: "description", op: "contains", value: "" }], date: { start: "", end: "" }, amount: { min: "", max: "" } }; testResult.value = null; }
+async function editRule(item) { addingAccount.value = false; const rule = await api.get(`${projectPath()}/rules/${item.id}`); ruleDraft.value = { ...rule, date: { start: rule.date.start || "", end: rule.date.end || "" }, amount: { min: rule.amount.min ?? "", max: rule.amount.max ?? "" }, conditions: rule.conditions.map((condition) => ({ ...condition, value: condition.values ? condition.values.join(", ") : condition.value })) }; testResult.value = null; }
 function body() {
   const draft = ruleDraft.value;
   return { name: draft.name, account: draft.account, enabled: draft.enabled, ...(draft.id ? { id: draft.id, order: draft.order } : {}), conditions: draft.conditions.map((condition) => (["containsall", "containsany"].includes(condition.op) ? { field: condition.field, op: condition.op, values: String(condition.value).split(",").map((value) => value.trim()).filter(Boolean), not: condition.not } : { field: condition.field, op: condition.op, value: condition.value, not: condition.not })), date: { start: draft.date.start || null, end: draft.date.end || null }, amount: { min: draft.amount.min === "" ? null : Number(draft.amount.min), max: draft.amount.max === "" ? null : Number(draft.amount.max) } };
@@ -133,8 +144,15 @@ async function moveRule(index, delta) {
     <Sheet v-if="ruleDraft" :title="ruleDraft.id ? 'Edit rule' : 'New rule'" @close="ruleDraft = null">
       <div class="grid2">
         <label class="field"><span>Name</span><input v-model="ruleDraft.name" placeholder="Supermarkets" /></label>
-        <label class="field"><span>Into account</span><select v-model="ruleDraft.account"><option v-for="account in accounts" :key="account.id" :value="account.id">{{ account.name }}</option></select></label>
+        <div class="field">
+          <span class="small muted" style="font-weight: 550">Into account</span>
+          <div class="row" style="flex-wrap: nowrap">
+            <select v-model="ruleDraft.account" aria-label="Into account"><option v-for="account in accounts" :key="account.id" :value="account.id">{{ account.name }}</option></select>
+            <button class="icon" aria-label="Add an account" title="Add an account" @click="addingAccount = !addingAccount"><Icon :name="addingAccount ? 'close' : 'plus'" /></button>
+          </div>
+        </div>
       </div>
+      <NewAccountForm v-if="addingAccount && project" :categories="project.categories" :name="ruleDraft.name" @created="accountAdded" @categories-changed="reloadProject" @cancel="addingAccount = false" />
       <label class="check"><input v-model="ruleDraft.enabled" type="checkbox" />Enabled</label>
       <p v-if="ruleDraft.example" class="card small">From: {{ ruleDraft.example.description }} · {{ formatDate(ruleDraft.example.date) }} · {{ formatMoney(ruleDraft.example.amount) }}</p>
       <h3>All of these</h3>

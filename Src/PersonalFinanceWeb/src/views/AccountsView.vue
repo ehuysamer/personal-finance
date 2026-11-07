@@ -4,6 +4,7 @@ import { datasources, go, projectPath, state, tenantPath, toast } from "../state
 import { formatPercent } from "../lib/format.js";
 import Icon from "../components/Icon.vue";
 import Sheet from "../components/Sheet.vue";
+import CategorySelect from "../components/CategorySelect.vue";
 
 const api = inject("api");
 const reloadWorkspace = inject("reloadWorkspace");
@@ -49,6 +50,7 @@ async function deleteProject() {
 // Categories, one at a time (inflation edited in percent; the API keeps fractions). A rename applies everywhere;
 // a delete moves the category's accounts (and the charts that total it) to another category.
 const categoryDraft = ref(null);
+const managing = ref(false);
 const categoryDelete = ref(null);
 function newCategory() { categoryDraft.value = { name: "", type: "expense", inflation: 3 }; }
 function editCategory(category) { categoryDraft.value = { ...category, inflation: Math.round(category.inflation * 10000) / 100 }; }
@@ -121,10 +123,7 @@ const age = computed(() => { if (!project.value?.birthDate) return null; const m
       </p>
       <div class="spread"><h2>Accounts</h2><button class="primary" @click="newAccount"><Icon name="plus" /> Account</button></div>
       <template v-for="group in grouped" :key="group.category.id">
-        <div class="spread" style="margin-top: 12px">
-          <h3 style="margin: 0">{{ group.category.name }} <span class="badge">{{ group.category.type }}</span> <span class="muted small">inflation {{ formatPercent(group.category.inflation) }}</span></h3>
-          <div class="row" style="gap: 0"><button class="icon ghost" :aria-label="`Rename ${group.category.name}`" @click="editCategory(group.category)"><Icon name="edit" /></button><button class="icon ghost" :aria-label="`Delete ${group.category.name}`" @click="startDeleteCategory(group.category)"><Icon name="trash" /></button></div>
-        </div>
+        <h3>{{ group.category.name }} <span class="badge">{{ group.category.type }}</span> <span class="muted small">inflation {{ formatPercent(group.category.inflation) }}</span></h3>
         <ul class="list">
           <li v-for="account in group.accounts" :key="account.id" class="link" @click="editAccount(account)">
             <div class="grow"><div class="title">{{ account.name }}</div><div class="sub"><template v-if="account.shortCode">{{ account.shortCode }} · </template>{{ (account.tags || []).join(", ") || "no tags" }}</div></div>
@@ -133,7 +132,7 @@ const age = computed(() => { if (!project.value?.birthDate) return null; const m
           <li v-if="!group.accounts.length" class="empty">No accounts</li>
         </ul>
       </template>
-      <div class="row" style="margin-top: 16px"><button @click="newCategory"><Icon name="plus" /> Category</button><button class="danger" @click="deleteProject">Delete project</button></div>
+      <div class="row" style="margin-top: 16px"><button @click="managing = true">Manage categories</button><button class="danger" @click="deleteProject">Delete project</button></div>
     </template>
     <p v-else-if="!projectDraft" class="muted">No project yet.</p>
 
@@ -148,6 +147,17 @@ const age = computed(() => { if (!project.value?.birthDate) return null; const m
       <div class="row end" style="margin-top: 12px"><button class="primary" :disabled="!projectDraft.name" @click="saveProject">Save</button></div>
     </Sheet>
 
+    <Sheet v-if="managing" title="Categories" @close="managing = false">
+      <p class="small muted">Renaming shows everywhere the category is used. Deleting moves its accounts to another category.</p>
+      <ul class="list">
+        <li v-for="category in project.categories" :key="category.id">
+          <div class="grow"><div class="title">{{ category.name }}</div><div class="sub">{{ category.type }} · inflation {{ formatPercent(category.inflation) }} · {{ accounts.filter((account) => account.category === category.id).length }} accounts</div></div>
+          <button class="icon ghost" :aria-label="`Rename ${category.name}`" @click="editCategory(category)"><Icon name="edit" /></button>
+          <button class="icon ghost" :aria-label="`Delete ${category.name}`" @click="startDeleteCategory(category)"><Icon name="trash" /></button>
+        </li>
+      </ul>
+      <div class="row end" style="margin-top: 10px"><button class="primary" @click="newCategory"><Icon name="plus" /> Category</button></div>
+    </Sheet>
     <Sheet v-if="categoryDraft" :title="categoryDraft.id ? `Edit ${categoryDraft.name || 'category'}` : 'New category'" @close="categoryDraft = null">
       <label class="field"><span>Name</span><input v-model="categoryDraft.name" placeholder="Pets" /></label>
       <div class="grid2">
@@ -166,7 +176,7 @@ const age = computed(() => { if (!project.value?.birthDate) return null; const m
     <Sheet v-if="accountDraft" :title="accountDraft.id ? 'Edit account' : 'New account'" @close="accountDraft = null">
       <label class="field"><span>Name</span><input v-model="accountDraft.name" placeholder="Groceries" /></label>
       <div class="grid2">
-        <label class="field"><span>Category</span><select v-model="accountDraft.category"><option v-for="category in project.categories" :key="category.id" :value="category.id">{{ category.name }}</option></select></label>
+        <CategorySelect v-model="accountDraft.category" :categories="project.categories" @created="load" />
         <label class="field"><span>Short code (for charts and formulas)</span><input v-model="accountDraft.shortCode" placeholder="FOOD" autocapitalize="characters" /></label>
       </div>
       <label class="field"><span>Tags (comma separated)</span><input v-model="accountDraft.tags" placeholder="essential, weekly" /></label>

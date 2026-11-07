@@ -114,3 +114,5 @@ label.button.primary { background: var(--accent); border-color: var(--accent); c
 button.sign { flex: 0 0 42px; padding: 0; font-size: 1.3rem; font-weight: 700; color: var(--ok); }
 button.sign.negate { color: var(--danger); border-color: var(--danger); background: var(--danger-soft); }
 .part > button.sign + select { flex: 0 0 100px; }
+.sample-grid { margin-top: 8px; max-height: 360px; overflow: auto; }
+.sample-grid td { max-width: 220px; overflow: hidden; text-overflow: ellipsis; }

@@ -110,8 +110,8 @@ $tenants/{tenant}.json                      tenant and members
       format options (csv delimiter, encoding, header rows to skip; json rows path; xlsx sheet), a **filename filter**
       (wildcard or regex, e.g. `ASB-*-Export.csv`), and its **translators**.
 - [C] **Import sample**: a sample file chosen, dropped on the sample card, or picked from Documents (the API reads the
-      document itself: `import_sample` with `documentPath`); the web shows its columns and first rows, and the user maps
-      them.
+      document itself: `import_sample` with `documentPath`); the web shows its columns and a grid of its first 10 rows
+      as they are in the file, and the user maps them.
 - [C] Target fields: `date`, `account`, `description`, `amount`. Each target has an ordered list of parts:
       a source column, or a fixed (hardcoded) value. Several parts are joined (text: with a separator, default
       space; amount: added, so debit and credit columns can make one amount, each with an optional sign flip).
@@ -157,10 +157,11 @@ $tenants/{tenant}.json                      tenant and members
 - [C] A project names one or more datasources (of its tenant).
 - [C] A project has a **birth date** (a person's age, or a company's founding date) so ages can be shown and
       forecasts can run "until age 65".
-- [C] Categories are edited on the spot on the Accounts page, one at a time: **add**, **rename** (name, type,
+- [C] Categories are edited in **Manage categories** (a pop-up on the Accounts page), one at a time: **add**, **rename** (name, type,
       inflation; accounts, charts and forecasts refer to a category by id, so the change shows everywhere) and
       **delete** (its accounts and the chart series that total it move to a category the user picks; forecasts drop
-      its inflation override; the last category cannot be deleted). They stay on the project.
+      its inflation override; the last category cannot be deleted). They stay on the project. Wherever a category is
+      chosen (adding an account, here or from a rule), a **+** next to the dropdown adds one on the spot.
 - [C] A project has a list of **categories** (e.g. Income, Housing, Food, Transport), each with a type
       `income` | `expense` | `asset` | `liability` and a default inflation rate for forecasting.
 - [C] Accounts within a project: add / edit / delete; `name`, optional **short code** (unique in the project,
@@ -183,7 +184,8 @@ $tenants/{tenant}.json                      tenant and members
       first, searchable), each with **Add rule**: the rule sheet opens pre-filled with a name and a "description
       contains" condition taken from the beneficiary words of its description (a run of up to four words without
       digits or bank noise such as POS, EFTPOS, CARD, AP#, exactly as written so it matches), and is tested at once.
-      After saving, **Analyse again** applies it. MCP: `unmatched_transactions` (with `suggestedRule`), `rule_suggest`.
+      A **+** next to "Into account" adds an account on the spot (name, category with its own +, short code) and
+      selects it. After saving, **Analyse again** applies it. MCP: `unmatched_transactions` (with `suggestedRule`), `rule_suggest`.
 
 ### Running analysis
 

@@ -121,6 +121,13 @@ async function save() {
       </div>
       <p v-if="sampleName" class="small">Sample: {{ sampleName }}</p>
       <p v-if="sample" class="small muted">{{ sample.rowCount }} rows, columns: {{ sample.columns.join(", ") }}</p>
+      <div v-if="sample?.rows?.length" class="table-wrap sample-grid" role="region" aria-label="Sample rows">
+        <table>
+          <thead><tr><th class="muted">#</th><th v-for="column in sample.columns" :key="column">{{ column }}</th></tr></thead>
+          <tbody><tr v-for="(row, index) in sample.rows.slice(0, 10)" :key="index"><td class="muted">{{ index + 1 }}</td><td v-for="column in sample.columns" :key="column">{{ row[column] }}</td></tr></tbody>
+        </table>
+      </div>
+      <p v-if="sample?.rowCount > 10" class="small muted">The first 10 of {{ sample.rowCount }} rows, as they are in the file.</p>
     </div>
     <Sheet v-if="picking" title="Sample from documents" @close="picking = null">
       <input v-model="picking.q" type="search" placeholder="Search documents" aria-label="Search documents" @input="searchDocuments" />

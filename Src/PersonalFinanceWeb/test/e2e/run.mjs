@@ -57,6 +57,7 @@ try {
   await page.getByRole("button", { name: "New importsource" }).click();
   await page.locator("input[type=file]").first().setInputFiles(fixture);
   await page.getByText("10 rows, columns: Date, Details, Debit, Credit").waitFor();
+  await page.getByRole("region", { name: "Sample rows" }).getByRole("cell", { name: "SALARY ACME" }).first().waitFor();
   await page.getByRole("button", { name: "Preview with this mapping" }).click();
   await page.getByRole("cell", { name: "-120.40" }).waitFor();
   await shot("1-importsource");
@@ -75,28 +76,33 @@ try {
   for (const [name, category, code] of [["Salary", "Income", "INC"], ["Groceries", "Food", "FOOD"], ["Rent", "Housing", "RENT"]]) {
     await page.getByRole("button", { name: "Account" }).click();
     await page.getByPlaceholder("Groceries").fill(name);
-    await page.getByLabel("Category").selectOption({ label: category });
+    await page.getByLabel("Category", { exact: true }).selectOption({ label: category });
     await page.getByPlaceholder("FOOD").fill(code);
     await page.getByRole("button", { name: "Save" }).click();
     await page.getByText(name, { exact: true }).waitFor();
   }
-  // Categories on the spot: add, rename (applies to its accounts), delete (its accounts move).
-  await page.getByRole("button", { name: "Category", exact: true }).click();
-  await page.getByPlaceholder("Pets").fill("Pets");
-  await page.getByRole("dialog").getByRole("button", { name: "Save" }).click();
+  // Add account with a new category from the +, then Manage categories: rename (applies to its accounts), delete
+  // (its accounts move).
   await page.getByRole("button", { name: "Account", exact: true }).click();
   await page.getByPlaceholder("Groceries").fill("Vet");
-  await page.getByLabel("Category").selectOption({ label: "Pets" });
+  await page.getByRole("button", { name: "Add a category" }).click();
+  await page.getByLabel("New category name").fill("Pets");
+  await page.getByRole("button", { name: "Add category" }).click();
+  await page.getByLabel("New category name").waitFor({ state: "detached" });
+  { const value = await page.getByLabel("Category", { exact: true }).inputValue(); if (value !== "pets") throw new Error(`the new category was not selected (${value}; ${await page.getByRole("dialog").innerText()})`); }
   await page.getByRole("dialog").getByRole("button", { name: "Save" }).click();
+  await page.locator("h3", { hasText: "Pets" }).waitFor();
+  await page.getByRole("button", { name: "Manage categories" }).click();
   await page.getByRole("button", { name: "Rename Pets" }).click();
-  await page.getByPlaceholder("Pets").fill("Animals");
-  await page.getByRole("dialog").getByRole("button", { name: "Save" }).click();
-  await page.getByRole("heading", { name: /^Animals/ }).waitFor();
+  await page.getByRole("dialog", { name: /^Edit Pets/ }).getByPlaceholder("Pets").fill("Animals");
+  await page.getByRole("dialog", { name: /^Edit/ }).getByRole("button", { name: "Save" }).click();
+  await page.getByRole("dialog", { name: "Categories" }).getByText("Animals", { exact: true }).waitFor();
   await page.getByRole("button", { name: "Delete Animals" }).click();
-  await page.getByRole("dialog").getByText("1 accounts are in this category").waitFor();
-  await page.getByRole("dialog").getByLabel("Move to").selectOption({ label: "Other" });
+  await page.getByRole("dialog", { name: "Delete Animals" }).getByText("1 accounts are in this category").waitFor();
+  await page.getByRole("dialog", { name: "Delete Animals" }).getByLabel("Move to").selectOption({ label: "Other" });
   await page.getByRole("button", { name: "Delete category" }).click();
   await page.getByText(/Deleted Animals: 1 accounts/).waitFor();
+  await page.getByRole("dialog", { name: "Categories" }).getByLabel("Close").click();
   await page.locator("h3", { hasText: "Other" }).waitFor();
   await shot("3-accounts");
 
@@ -125,7 +131,16 @@ try {
   if (await sheet.getByPlaceholder("Supermarkets").inputValue() !== "Rent") throw new Error("the rule name was not pre-filled");
   if (await sheet.getByLabel("Value", { exact: true }).inputValue() !== "Rent") throw new Error("the condition was not pre-filled");
   await sheet.getByText("3 transactions match").waitFor();
-  await sheet.getByLabel("Into account").selectOption({ label: "Rent" });
+  // A new account (in a new category) for it, made from the rule form.
+  await sheet.getByRole("button", { name: "Add an account" }).click();
+  await sheet.getByLabel("New account name").fill("Rent payments");
+  await sheet.getByRole("button", { name: "Add a category" }).click();
+  await sheet.getByLabel("New category name").fill("Home");
+  await sheet.getByRole("button", { name: "Add category" }).click();
+  await sheet.getByLabel("New category name").waitFor({ state: "detached" });
+  await sheet.getByRole("button", { name: "Add account" }).click();
+  await sheet.getByLabel("New account name").waitFor({ state: "detached" });
+  if ((await sheet.getByLabel("Into account").locator("option:checked").textContent()) !== "Rent payments") throw new Error("the new account was not selected");
   await shot("4b-rule-from-unmatched");
   await sheet.getByRole("button", { name: "Save" }).click();
   await page.getByRole("button", { name: "Analyse again" }).click();
