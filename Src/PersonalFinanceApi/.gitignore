@@ -1,0 +1,13 @@
+node_modules/
+build/
+coverage/
+.env
+.env.*
+!.env.example
+*.zip
+*.tfstate
+*.tfstate.*
+.terraform/
+infra/*.tfplan
+infra/*.zip
+src/deployment.json
