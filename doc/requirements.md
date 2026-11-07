@@ -161,7 +161,7 @@ $tenants/{tenant}.json                      tenant and members
       inflation; accounts, charts and forecasts refer to a category by id, so the change shows everywhere) and
       **delete** (its accounts and the chart series that total it move to a category the user picks; forecasts drop
       its inflation override; the last category cannot be deleted). They stay on the project. Wherever a category is
-      chosen (adding an account, here or from a rule), a **+** next to the dropdown adds one on the spot.
+      chosen (adding an account, here or from a rule), a **+** next to the dropdown opens a **New category** pop-up.
 - [C] A project has a list of **categories** (e.g. Income, Housing, Food, Transport), each with a type
       `income` | `expense` | `asset` | `liability` and a default inflation rate for forecasting.
 - [C] Accounts within a project: add / edit / delete; `name`, optional **short code** (unique in the project,
@@ -184,8 +184,8 @@ $tenants/{tenant}.json                      tenant and members
       first, searchable), each with **Add rule**: the rule sheet opens pre-filled with a name and a "description
       contains" condition taken from the beneficiary words of its description (a run of up to four words without
       digits or bank noise such as POS, EFTPOS, CARD, AP#, exactly as written so it matches), and is tested at once.
-      A **+** next to "Into account" adds an account on the spot (name, category with its own +, short code) and
-      selects it. After saving, **Analyse again** applies it. MCP: `unmatched_transactions` (with `suggestedRule`), `rule_suggest`.
+      A **+** next to "Into account" opens a **New account** pop-up (name, category with its own +, short code) and
+      selects the account it adds. After saving, **Analyse again** applies it. MCP: `unmatched_transactions` (with `suggestedRule`), `rule_suggest`.
 
 ### Running analysis
 

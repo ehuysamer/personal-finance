@@ -139,6 +139,8 @@ try {
   await sheet.getByLabel("New account name").fill("Rent payments");
   await sheet.getByRole("button", { name: "Add a category" }).click();
   await sheet.getByLabel("New category name").fill("Home");
+  await page.getByRole("dialog", { name: "New category" }).waitFor();
+  await shot("4c-new-category-popup");
   await sheet.getByRole("button", { name: "Add category" }).click();
   await sheet.getByLabel("New category name").waitFor({ state: "detached" });
   await sheet.getByRole("button", { name: "Add account" }).click();

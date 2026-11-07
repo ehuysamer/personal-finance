@@ -148,7 +148,7 @@ async function moveRule(index, delta) {
           <span class="small muted" style="font-weight: 550">Into account</span>
           <div class="row" style="flex-wrap: nowrap">
             <select v-model="ruleDraft.account" aria-label="Into account"><option v-for="account in accounts" :key="account.id" :value="account.id">{{ account.name }}</option></select>
-            <button class="icon" aria-label="Add an account" title="Add an account" @click="addingAccount = !addingAccount"><Icon :name="addingAccount ? 'close' : 'plus'" /></button>
+            <button class="icon" aria-label="Add an account" title="Add an account" @click="addingAccount = true"><Icon name="plus" /></button>
           </div>
         </div>
       </div>
