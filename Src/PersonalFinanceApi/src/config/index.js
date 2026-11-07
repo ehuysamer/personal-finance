@@ -1,3 +1,8 @@
+import { readFileSync } from "node:fs";
+
+// Written by scripts/build.mjs for /v1/status (missing when run from source).
+function readDeployment() { try { return JSON.parse(readFileSync(new URL("../deployment.json", import.meta.url), "utf8")); } catch { return null; } }
+
 const defaults = {
   env: "dev",
   region: "ap-southeast-2",
@@ -46,6 +51,7 @@ export default function getConfig(overrides = {}) {
     localDataDirectory: env.PERSONALFINANCE_LOCAL_DATA_DIR || "",
     workerFunctionName: env.PERSONALFINANCE_WORKER_FUNCTION_NAME || "",
     webOrigins: list(env.PERSONALFINANCE_WEB_ORIGINS),
+    deployment: readDeployment(),
     ...overrides
   };
 }
