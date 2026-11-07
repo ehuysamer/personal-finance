@@ -110,6 +110,14 @@ export default function createDocumentsService({ store, importService, config, c
     return items.length;
   }
 
+  // A document's content (e.g. as an import sample).
+  async function read(tenant, { path }) {
+    const clean = cleanPath(path);
+    const entry = (await all(tenant)).find((item) => item.path === clean);
+    if (!entry) throw new HttpError(404, "ERR-NOT-FOUND", `${clean} was not found`);
+    return { name: entry.name, size: entry.size, content: (await store.get(keyOf(tenant, clean))).body };
+  }
+
   // Import: the datasources and importsources whose filename filters match, then import (the document stays).
   async function candidates(tenant, { path }) { return { path: cleanPath(path), candidates: await importService.candidatesFor(tenant, cleanPath(path).split("/").pop()) }; }
   async function importDocument(tenant, { path, datasource, importsource }) {
@@ -119,5 +127,5 @@ export default function createDocumentsService({ store, importService, config, c
     return { path: clean, ...result };
   }
 
-  return { list, search, upload, uploadUrl, download, move, remove, rebuild, candidates, importDocument, cleanPath };
+  return { list, search, read, upload, uploadUrl, download, move, remove, rebuild, candidates, importDocument, cleanPath };
 }

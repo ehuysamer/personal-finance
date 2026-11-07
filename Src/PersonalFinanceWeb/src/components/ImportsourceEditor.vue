@@ -1,9 +1,11 @@
 <script setup>
 import { computed, inject, reactive, ref } from "vue";
 import { readBase64 } from "../lib/api.js";
+import { filesFromDrop } from "../lib/drop.js";
 import { formatMoney } from "../lib/format.js";
 import { tenantPath, toast } from "../state.js";
 import Icon from "./Icon.vue";
+import Sheet from "./Sheet.vue";
 
 // One importsource: format, filename filter and the translators (per target field an ordered list of parts),
 // with "Import sample" to see a file's columns and the normalised rows before saving.
@@ -38,23 +40,45 @@ function payload() {
   return body;
 }
 
-async function runSample(file = sampleFile.value) {
-  if (!file) return;
-  sampleFile.value = file;
+// The sample: a file chosen or dropped here ({ file }), or a document ({ path, name }), which the API reads itself.
+async function runSample(source = sampleFile.value) {
+  if (!source) return;
+  sampleFile.value = source;
+  const name = source.file ? source.file.name : source.name;
   busy.value = true; error.value = "";
   try {
-    if (!draft.name) draft.name = file.name.replace(/\.[^.]+$/, "");
-    const extension = file.name.split(".").pop().toLowerCase();
+    if (!draft.name) draft.name = name.replace(/\.[^.]+$/, "");
+    const extension = name.split(".").pop().toLowerCase();
     if (!props.source && ["csv", "json", "xlsx"].includes(extension)) draft.format = extension;
-    if (!props.source && !draft.filenameFilter.pattern) draft.filenameFilter.pattern = file.name.replace(/\d+/g, "*").replace(/\*+/g, "*");
+    if (!props.source && !draft.filenameFilter.pattern) draft.filenameFilter.pattern = name.replace(/\d+/g, "*").replace(/\*+/g, "*");
     const translatorsReady = TARGETS.every((target) => target.id === "account" || draft.translators[target.id].parts.length);
-    // A sample needs only the start of a big CSV (cut at the last whole line); other formats are read whole.
-    const part = draft.format === "csv" && file.size > 2 * 1024 * 1024 ? await cutCsv(file) : file;
-    sample.value = await api.post(`${tenantPath()}/datasources/${props.datasource}/sample`, { filename: file.name, contentBase64: await readBase64(part), format: draft.format, options: draft.options, ...(translatorsReady ? { translators: draft.translators } : {}) });
+    let body;
+    if (source.file) {
+      // A sample needs only the start of a big CSV (cut at the last whole line); other formats are read whole.
+      const part = draft.format === "csv" && source.file.size > 2 * 1024 * 1024 ? await cutCsv(source.file) : source.file;
+      body = { filename: name, contentBase64: await readBase64(part) };
+    } else body = { documentPath: source.path };
+    sample.value = await api.post(`${tenantPath()}/datasources/${props.datasource}/sample`, { ...body, format: draft.format, options: draft.options, ...(translatorsReady ? { translators: draft.translators } : {}) });
     if (!translatorsReady) guess();
   } catch (failure) { error.value = failure.message; }
   busy.value = false;
 }
+
+const dragging = ref(false);
+async function onDrop(event) {
+  dragging.value = false;
+  const [first] = await filesFromDrop(event.dataTransfer);
+  if (first) await runSample({ file: first.file });
+}
+// Choose a statement from Documents.
+const picking = ref(null);
+async function openDocuments() { picking.value = { q: "", files: [] }; await searchDocuments(); }
+async function searchDocuments() {
+  const files = (await api.get(`${tenantPath()}/documents`, { q: picking.value.q, recursive: true })).files;
+  picking.value.files = files.filter((file) => /\.(csv|json|xlsx)$/i.test(file.name));
+}
+function pickDocument(file) { picking.value = null; runSample({ path: file.path, name: file.name }); }
+const sampleName = computed(() => (sampleFile.value ? (sampleFile.value.file ? sampleFile.value.file.name : sampleFile.value.path) : ""));
 
 async function cutCsv(file) {
   const text = await file.slice(0, 2 * 1024 * 1024).text();
@@ -88,12 +112,23 @@ async function save() {
 
 <template>
   <div>
-    <div class="card">
+    <div class="card dropzone sample" :class="{ dragging }" @dragover.prevent="dragging = true" @dragleave.self="dragging = false" @drop.prevent="onDrop">
       <h3>Import sample</h3>
-      <p class="muted small">Choose a statement to see its columns and what the mapping makes of it. Nothing is imported.</p>
-      <input type="file" accept=".csv,.json,.xlsx,text/csv,application/json" @change="runSample($event.target.files[0])" />
+      <p class="muted small">Choose a statement, drop one here, or pick one from Documents, to see its columns and what the mapping makes of it. Nothing is imported.</p>
+      <div class="row">
+        <label class="button"><Icon name="upload" /> Choose file<input type="file" accept=".csv,.json,.xlsx,text/csv,application/json" hidden @change="runSample({ file: $event.target.files[0] }); $event.target.value = ''" /></label>
+        <button @click="openDocuments"><Icon name="document" /> From documents</button>
+      </div>
+      <p v-if="sampleName" class="small">Sample: {{ sampleName }}</p>
       <p v-if="sample" class="small muted">{{ sample.rowCount }} rows, columns: {{ sample.columns.join(", ") }}</p>
     </div>
+    <Sheet v-if="picking" title="Sample from documents" @close="picking = null">
+      <input v-model="picking.q" type="search" placeholder="Search documents" aria-label="Search documents" @input="searchDocuments" />
+      <ul class="list" style="margin-top: 8px">
+        <li v-for="file in picking.files" :key="file.path" class="link" @click="pickDocument(file)"><div class="grow"><div class="title">{{ file.name }}</div><div class="sub">{{ file.path }}</div></div><Icon name="chevron" /></li>
+        <li v-if="!picking.files.length" class="empty">No statements (CSV, Excel, JSON) in documents</li>
+      </ul>
+    </Sheet>
 
     <div class="grid2">
       <label class="field"><span>Name</span><input v-model="draft.name" placeholder="ASB CSV export" /></label>

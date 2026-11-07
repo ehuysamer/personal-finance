@@ -155,6 +155,18 @@ try {
   await page.getByRole("button", { name: "From documents" }).click();
   await page.getByRole("dialog").getByText("sample-statement.csv").first().waitFor();
   await shot("9-from-documents");
+  // An importsource's sample from Documents, then from a dropped file.
+  await page.getByRole("dialog").getByLabel("Close").click();
+  await page.getByRole("button", { name: "Importsources" }).click();
+  await page.getByRole("button", { name: "New importsource" }).click();
+  await page.getByRole("button", { name: "From documents" }).click();
+  await page.getByRole("dialog", { name: "Sample from documents" }).getByText("sample-statement.csv").first().click();
+  await page.getByText("Sample: sample-statement.csv").waitFor();
+  await page.getByText("10 rows, columns: Date, Details, Debit, Credit").waitFor();
+  await dropFiles(page, "div.dropzone.sample", [statement("06")]);
+  await page.getByText("Sample: sample-drop-06.csv").waitFor();
+  await page.getByText("1 rows, columns: Date, Details, Debit, Credit").waitFor();
+  await shot("10-sample-sources");
   await browser.close();
   console.log("e2e: passed");
 } catch (error) {

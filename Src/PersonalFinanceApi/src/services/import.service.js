@@ -44,10 +44,11 @@ export default function createImportService({ store, indexService, workspaceServ
 
   // Import sample: a file's columns and first rows, and (with an importsource or unsaved translators) the
   // normalised rows it would give, before anything is saved.
-  async function sample(tenant, ds, { filename, contentBase64, format, options, translators, importsource, limit = 20 }) {
+  // The sample is contentBase64, or content already read by the caller (a document: see documents_list).
+  async function sample(tenant, ds, { filename, contentBase64, content, format, options, translators, importsource, limit = 20 }) {
     await datasource(tenant, ds);
-    const buffer = Buffer.from(String(contentBase64 || ""), "base64");
-    if (!buffer.length) throw new HttpError(400, "ERR-UPLOAD", "contentBase64 is required");
+    const buffer = content || Buffer.from(String(contentBase64 || ""), "base64");
+    if (!buffer.length) throw new HttpError(400, "ERR-UPLOAD", "contentBase64 or documentPath is required");
     let definition = importsource ? await importsources.get(folder(tenant, ds), importsource) : null;
     const fileFormat = format || definition?.format || String(filename || "").split(".").pop().toLowerCase();
     const table = parseFile(buffer, fileFormat, options || definition?.options || {}, { maxRows: config.maxRowsPerFile });

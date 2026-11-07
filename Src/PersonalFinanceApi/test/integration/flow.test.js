@@ -178,3 +178,17 @@ test("documents: upload into folders, list, move, download, import a statement (
   const rebuilt = await api.call("POST", `${T}/indexes/rebuild`);
   assert.equal(rebuilt.body.documents, 1);
 });
+
+test("an import sample can come from Documents", async (t) => {
+  const api = await startTestApi();
+  t.after(() => api.close());
+  const tenant = (await api.call("GET", "/v1/me")).body.tenants[0].id;
+  const T = `/v1/tenants/${tenant}`;
+  const ds = (await api.call("POST", `${T}/datasources`, { name: "Visa" })).body;
+  await api.call("POST", `${T}/documents`, { path: "statements/visa-feb.csv", contentBase64: Buffer.from("Date,Details,Amount\n02/02/2026,Cafe,-5\n").toString("base64") });
+  const sample = await api.call("POST", `${T}/datasources/${ds.id}/sample`, { documentPath: "statements/visa-feb.csv", format: "csv" });
+  assert.equal(sample.status, 200, JSON.stringify(sample.body));
+  assert.deepEqual([sample.body.filename, sample.body.columns, sample.body.rowCount], ["visa-feb.csv", ["Date", "Details", "Amount"], 1]);
+  assert.equal((await api.call("POST", `${T}/datasources/${ds.id}/sample`, { documentPath: "statements/missing.csv" })).status, 404);
+  assert.equal((await api.call("POST", `${T}/datasources/${ds.id}/sample`, {})).status, 400);
+});

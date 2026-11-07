@@ -110,3 +110,4 @@ label.button.primary { background: var(--accent); border-color: var(--accent); c
 .list > li.stack > .grow { flex: 1 1 100%; }
 .list > li.stack > .actions { margin-left: auto; display: flex; gap: 2px; }
 @media (min-width: 640px) { .list > li.stack { flex-wrap: nowrap; } .list > li.stack > .grow { flex: 1 1 auto; } }
+.dropzone.sample { min-height: 0; margin: 10px 0; padding: 12px; border: 2px dashed var(--border); }

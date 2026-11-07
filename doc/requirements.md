@@ -109,7 +109,9 @@ $tenants/{tenant}.json                      tenant and members
 - [C] A datasource has one or more importsources. Each has `name`, `format` (`csv` | `json` | `xlsx`; more later),
       format options (csv delimiter, encoding, header rows to skip; json rows path; xlsx sheet), a **filename filter**
       (wildcard or regex, e.g. `ASB-*-Export.csv`), and its **translators**.
-- [C] **Import sample**: upload a sample file; the web shows its columns and first rows, and the user maps them.
+- [C] **Import sample**: a sample file chosen, dropped on the sample card, or picked from Documents (the API reads the
+      document itself: `import_sample` with `documentPath`); the web shows its columns and first rows, and the user maps
+      them.
 - [C] Target fields: `date`, `account`, `description`, `amount`. Each target has an ordered list of parts:
       a source column, or a fixed (hardcoded) value. Several parts are joined (text: with a separator, default
       space; amount: added, so debit and credit columns can make one amount, each with an optional sign flip).
