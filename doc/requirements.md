@@ -77,6 +77,7 @@ $tenants/{tenant}.json                      tenant and members
 {tenant}/{project}/jobs/$index.json, {jobId}.json   long-running jobs (last 50) and their state
 {tenant}/{datasource}/$uploads/{uploadId}/{filename}    large uploads, removed once imported
 {tenant}/$users/{sha256(email)}.json         a user's preferences (active project)
+{tenant}/import/...                         the import folder; imported files move to import/imported/{yyyy-mm-dd}/
 ```
 
 - [C] Indexes (`$index.json`) are lists of things (tenants, projects, datasources, importsources, files, accounts,
@@ -92,6 +93,11 @@ $tenants/{tenant}.json                      tenant and members
 
 - [C] A datasource is a named, normalised place where data to import lives (e.g. "ASB everyday", "Kiwisaver").
       Add / edit / delete; fields `id`, `name`, `description`, `currency` (default NZD).
+- [C] **Import folder** per tenant: `{tenant}/import/` in the bucket (`data/{tenant}/import/` offline; sub-folders
+      allowed). Files dropped there (S3 console, `aws s3 cp`, `sync:push`) are listed on the Import page with the
+      datasources and importsources whose filename filters match; the user imports one, or all files with exactly one
+      match (`npm run import -- <tenant> --folder` offline). An imported file moves to
+      `import/imported/{yyyy-mm-dd}/`. `import` is therefore not allowed as a project or datasource id.
 - [C] Files are uploaded in the web (several at once, also from the phone) or from `data/import/`. Each upload picks
       its importsource by the filename filters (below); when none or several match, the user chooses.
 

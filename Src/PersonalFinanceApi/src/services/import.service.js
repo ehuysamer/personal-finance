@@ -79,6 +79,10 @@ export default function createImportService({ store, indexService, workspaceServ
       await store.delete(uploadKey);
     } else buffer = Buffer.from(String(contentBase64 || ""), "base64");
     if (!buffer.length) throw new HttpError(400, "ERR-UPLOAD", "contentBase64 is required");
+    return await importBuffer(tenant, ds, name, buffer, importsource);
+  }
+
+  async function importBuffer(tenant, ds, name, buffer, importsource) {
     if (buffer.length > config.maxUploadBytes) throw new HttpError(413, "ERR-TOO-LARGE", `files are at most ${Math.round(config.maxUploadBytes / 1048576)} MB`);
     let sourceId = importsource;
     if (!sourceId) {
@@ -104,6 +108,56 @@ export default function createImportService({ store, indexService, workspaceServ
     const entry = { id: fileId, filename: name, size: buffer.length, sha256, importsource: sourceId, rows: rows.length, rejected: rejected.length, firstDate: dates[0] || null, lastDate: dates.at(-1) || null, importedAt: previous?.importedAt || clock().toISOString(), updatedAt: clock().toISOString(), status: "imported" };
     await updateJson(store, keys.filesIndex(tenant, ds), (index) => ({ items: [...index.items.filter((file) => file.id !== fileId), entry], updatedAt: clock().toISOString() }), { items: [] });
     return { status: previous ? "replaced" : "imported", file: entry, ...report, rejected: rejected.slice(0, 20), rejectedCount: rejected.length };
+  }
+
+  // The tenant's import folder ({tenant}/import/, data/{tenant}/import/ offline): files dropped there (S3 console,
+  // aws s3 cp, sync:push) are listed with the datasources and importsources whose filename filters match, and
+  // imported from there. An imported file moves to import/imported/{yyyy-mm-dd}/ unless keep is asked for.
+  const IMPORT = (tenant) => `${tenant}/import/`;
+  async function candidatesFor(tenant, filename) {
+    const out = [];
+    for (const item of await workspaceService.list(tenant, "datasource")) {
+      for (const source of await matchImportsource(tenant, item.id, filename)) out.push({ datasource: item.id, datasourceName: item.name, importsource: source.id, importsourceName: source.name });
+    }
+    return out;
+  }
+  async function folderFiles(tenant) {
+    const prefix = IMPORT(tenant);
+    const paths = (await store.list(prefix)).map((key) => key.slice(prefix.length)).filter((path) => path && !path.startsWith("imported/") && !path.endsWith("/") && !path.split("/").some((part) => part.startsWith(".")));
+    const items = [];
+    for (const path of paths) {
+      const filename = path.split("/").pop();
+      items.push({ path, filename, candidates: await candidatesFor(tenant, filename) });
+    }
+    return items;
+  }
+  function folderKey(tenant, path) {
+    const clean = String(path || "").replaceAll("\\", "/");
+    if (!clean || clean.startsWith("/") || clean.startsWith("imported/") || clean.split("/").some((part) => !part || part === "." || part === "..")) throw new HttpError(400, "ERR-PATH", "path is a file in the import folder");
+    return `${IMPORT(tenant)}${clean}`;
+  }
+  // Imports one file of the folder: into the datasource and importsource given, or the only ones that match.
+  async function importFromFolder(tenant, { path, datasource: ds, importsource, keep = false }) {
+    const key = folderKey(tenant, path);
+    const name = cleanFilename(key.split("/").pop());
+    let target = ds ? { datasource: ds, importsource } : null;
+    if (!target) {
+      const candidates = await candidatesFor(tenant, name);
+      if (candidates.length !== 1) throw new HttpError(409, "ERR-IMPORTSOURCE-CHOICE", candidates.length ? "several importsources match this filename; choose one" : "no importsource matches this filename; choose a datasource and importsource", { candidates });
+      target = candidates[0];
+    }
+    await datasource(tenant, target.datasource);
+    let object;
+    try { object = await store.get(key); } catch (error) { if (error.statusCode === 404) throw new HttpError(404, "ERR-NOT-FOUND", `${path} is not in the import folder`); throw error; }
+    if (object.body.length > config.maxUploadBytes) throw new HttpError(413, "ERR-TOO-LARGE", `files are at most ${Math.round(config.maxUploadBytes / 1048576)} MB`);
+    const result = await importBuffer(tenant, target.datasource, name, object.body, target.importsource);
+    let movedTo = null;
+    if (!keep) {
+      movedTo = `imported/${clock().toISOString().slice(0, 10)}/${path}`;
+      await store.put(`${IMPORT(tenant)}${movedTo}`, object.body, { contentType: object.contentType || "application/octet-stream" });
+      await store.delete(key);
+    }
+    return { path, datasource: target.datasource, importsource: result.file?.importsource || target.importsource, movedTo, ...result };
   }
 
   async function deleteFile(tenant, ds, fileId) {
@@ -200,6 +254,6 @@ export default function createImportService({ store, indexService, workspaceServ
       match: matchImportsource,
       rebuild: (tenant, ds) => importsources.rebuild(folder(tenant, ds))
     },
-    files, sample, upload, uploadUrl, deleteFile, manualTransactions, totals, datasourceTransactions, bankAccounts
+    files, sample, upload, uploadUrl, deleteFile, folderFiles, importFromFolder, manualTransactions, totals, datasourceTransactions, bankAccounts
   };
 }

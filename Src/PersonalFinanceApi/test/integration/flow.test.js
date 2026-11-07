@@ -121,3 +121,28 @@ test("an account that is not on the allow-list is refused", async (t) => {
   const me = await api.call("GET", "/v1/me");
   assert.equal(me.status, 403);
 });
+
+test("the tenant import folder: listed with matching importsources, imported, then moved aside", async (t) => {
+  const api = await startTestApi();
+  t.after(() => api.close());
+  const tenant = (await api.call("GET", "/v1/me")).body.tenants[0].id;
+  const T = `/v1/tenants/${tenant}`;
+  const reserved = await api.call("POST", `${T}/datasources`, { name: "Import" });
+  assert.equal(reserved.body.id, "import-2", "import is the folder, not an id");
+  const ds = (await api.call("POST", `${T}/datasources`, { name: "Visa" })).body;
+  const translators = { date: { parts: [{ type: "column", column: "Date" }], format: "dd/MM/yyyy" }, account: { parts: [{ type: "fixed", value: "Visa" }] }, description: { parts: [{ type: "column", column: "Details" }] }, amount: { parts: [{ type: "column", column: "Amount" }] } };
+  await api.call("POST", `${T}/datasources/${ds.id}/importsources`, { name: "Visa CSV", format: "csv", filenameFilter: "visa-*.csv", translators });
+  await api.deps.store.put(`${tenant}/import/2026/visa-jan.csv`, "Date,Details,Amount\n02/01/2026,Cafe,-5\n");
+  await api.deps.store.put(`${tenant}/import/unknown.csv`, "x\n1\n");
+  const listed = await api.call("GET", `${T}/import-folder`);
+  assert.deepEqual(listed.body.items.map((item) => [item.path, item.candidates.map((c) => c.importsource)]), [["2026/visa-jan.csv", ["visa-csv"]], ["unknown.csv", []]]);
+  const imported = await api.call("POST", `${T}/import-folder/import`, { path: "2026/visa-jan.csv" });
+  assert.equal(imported.status, 201, JSON.stringify(imported.body));
+  assert.equal(imported.body.added, 1);
+  assert.match(imported.body.movedTo, /^imported\/\d{4}-\d{2}-\d{2}\/2026\/visa-jan.csv$/);
+  assert.deepEqual((await api.call("GET", `${T}/import-folder`)).body.items.map((item) => item.path), ["unknown.csv"]);
+  const unmatched = await api.call("POST", `${T}/import-folder/import`, { path: "unknown.csv" });
+  assert.equal(unmatched.status, 409);
+  const escape = await api.call("POST", `${T}/import-folder/import`, { path: "../other/x.csv" });
+  assert.equal(escape.status, 400);
+});

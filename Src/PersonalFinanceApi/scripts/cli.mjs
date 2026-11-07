@@ -1,6 +1,7 @@
 // Offline command line: the same services as the API, on the local data/ folder (or the bucket with --s3),
 // signed in as the local owner, with jobs run here slice after slice until they end.
 //   npm run import -- <tenant> <datasource> [files...]   (no files: everything in data/import/)
+//   npm run import -- <tenant> --folder                  every file in the tenant's import folder with one match
 //   npm run analyse -- <tenant> [project]                (project: the active one when left out)
 //   npm run forecast -- <tenant> [project] <forecast>
 import fs from "node:fs/promises";
@@ -32,7 +33,13 @@ async function runJob(project, type, params) {
   return final;
 }
 
-if (command === "import") {
+if (command === "import" && process.argv.includes("--folder")) {
+  for (const item of await deps.importService.folderFiles(tenant)) {
+    if (item.candidates.length !== 1) { console.log(`${item.path}: skipped, ${item.candidates.length} matching importsources`); continue; }
+    const result = await deps.importService.importFromFolder(tenant, { path: item.path });
+    console.log(`${item.path}: ${result.status} into ${result.datasource}, ${result.added ?? 0} added, ${result.alreadyPresent ?? 0} already present`);
+  }
+} else if (command === "import") {
   const [datasource, ...files] = rest;
   if (!datasource) { console.error("usage: cli.mjs import <tenant> <datasource> [files...]"); process.exit(2); }
   const dropFolder = path.join(root, "data", "import");

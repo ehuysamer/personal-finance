@@ -29,6 +29,28 @@ const totalDraft = ref(null);
 const manualDraft = ref(null);
 
 const D = () => `${tenantPath()}/datasources/${current.value}`;
+
+// The tenant's import folder ({tenant}/import/ in the bucket): files dropped there, each with its matching
+// datasource and importsource; the user imports one, or every file with exactly one match.
+const folder = ref({ folder: "", items: [] });
+const folderResults = ref({});
+const picks = ref({});
+async function loadFolder() {
+  try { folder.value = await api.get(`${tenantPath()}/import-folder`); for (const item of folder.value.items) picks.value[item.path] ??= item.candidates.length === 1 ? 0 : null; } catch (failure) { error.value = failure.message; }
+}
+async function importFromFolder(item) {
+  const pick = item.candidates[picks.value[item.path]];
+  folderResults.value[item.path] = "importing…";
+  try {
+    const result = await api.post(`${tenantPath()}/import-folder/import`, { path: item.path, ...(pick ? { datasource: pick.datasource, importsource: pick.importsource } : {}) });
+    folderResults.value[item.path] = result.status === "already-imported" ? `already imported as ${result.sameAs}` : `${result.status} into ${result.datasource}: ${result.added} added, ${result.alreadyPresent} already there`;
+  } catch (failure) { folderResults.value[item.path] = failure.message; }
+}
+async function importAllMatched() {
+  for (const item of folder.value.items.filter((entry) => picks.value[entry.path] !== null)) await importFromFolder(item);
+  await loadFolder();
+}
+watch(current, (value) => { if (!value) loadFolder(); }, { immediate: true });
 async function load() {
   error.value = "";
   if (!current.value) return;
@@ -119,6 +141,21 @@ const bankNames = computed(() => banks.value.map((bank) => bank.account).filter(
         <div class="grow"><div class="title">{{ item.name }}</div><div class="sub">{{ item.id }}</div></div><Icon name="chevron" />
       </li>
       <li v-if="!datasources().length" class="empty">No datasources yet</li>
+    </ul>
+    <div class="spread"><h2>Import folder</h2><div class="row"><button class="icon ghost" aria-label="Refresh" @click="loadFolder"><Icon name="refresh" /></button><button v-if="folder.items.some((item) => picks[item.path] !== null)" class="primary" @click="importAllMatched">Import all</button></div></div>
+    <p class="muted small">Files put in <code>{{ folder.folder }}</code> in the bucket (or <code>data/{{ folder.folder }}</code> offline). Imported files move to <code>import/imported/</code>.</p>
+    <ul class="list">
+      <li v-for="item in folder.items" :key="item.path" style="flex-wrap: wrap">
+        <div class="grow"><div class="title">{{ item.path }}</div>
+          <div v-if="folderResults[item.path]" class="sub">{{ folderResults[item.path] }}</div>
+          <select v-else v-model="picks[item.path]" aria-label="Datasource and importsource" style="margin-top: 4px">
+            <option :value="null">{{ item.candidates.length ? "Choose where to import" : "No importsource matches this name" }}</option>
+            <option v-for="(candidate, index) in item.candidates" :key="index" :value="index">{{ candidate.datasourceName }} · {{ candidate.importsourceName }}</option>
+          </select>
+        </div>
+        <button v-if="!folderResults[item.path]" :disabled="picks[item.path] === null" @click="importFromFolder(item)">Import</button>
+      </li>
+      <li v-if="!folder.items.length" class="empty">The import folder is empty</li>
     </ul>
     <Sheet v-if="creating" title="New datasource" @close="creating = false">
       <label class="field"><span>Name</span><input v-model="newName" placeholder="ASB everyday" @keyup.enter="createDatasource" /></label>
