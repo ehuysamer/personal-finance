@@ -18,6 +18,7 @@ import createAnalysisService from "./services/analysis.service.js";
 import createForecastService from "./services/forecast.service.js";
 import createChartService from "./services/chart.service.js";
 import createDocumentsService from "./services/documents.service.js";
+import createCategoryService from "./services/category.service.js";
 import createJobService, { createInlineDispatcher, createLambdaDispatcher, createLocalDispatcher } from "./services/job.service.js";
 
 // Everything is wired here; overrides let tests and the command line swap the store, leases, clock or dispatcher.
@@ -38,10 +39,11 @@ export function buildDependencies(overrides = {}) {
   const forecastService = createForecastService({ store, indexService, workspaceService, projectService, resultsService, config, clock });
   const chartService = createChartService({ workspaceService, projectService, resultsService, forecastService });
   const documentsService = createDocumentsService({ store, importService, config, clock });
+  const categoryService = createCategoryService({ store, workspaceService, projectService, forecastService, clock });
   let jobService;
   const dispatcher = overrides.dispatcher || (config.workerFunctionName ? createLambdaDispatcher({ functionName: config.workerFunctionName, region: config.region }) : createLocalDispatcher(() => jobService, config));
   jobService = createJobService({ store, leases, config, clock, dispatcher, handlers: { analysis: analysisService.handler, forecast: forecastService.handler } });
-  return { config, store, leases, clock, indexService, tenantDirectory, workspaceService, importService, projectService, resultsService, analysisService, forecastService, chartService, documentsService, jobService, dispatcher, verifier: overrides.verifier };
+  return { config, store, leases, clock, indexService, tenantDirectory, workspaceService, importService, projectService, resultsService, analysisService, forecastService, chartService, documentsService, categoryService, jobService, dispatcher, verifier: overrides.verifier };
 }
 
 export { createInlineDispatcher };

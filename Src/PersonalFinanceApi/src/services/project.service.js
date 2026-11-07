@@ -61,6 +61,8 @@ export default function createProjectService({ store, indexService, workspaceSer
       async list(tenant, projectId) { await ensureBuiltIns(tenant, projectId); return await accounts.list(keys.accounts(tenant, projectId)); },
       async all(tenant, projectId) { await ensureBuiltIns(tenant, projectId); return await accounts.all(keys.accounts(tenant, projectId)); },
       get: (tenant, projectId, id) => accounts.get(keys.accounts(tenant, projectId), id),
+      // A write without validation (a category's accounts moving to another category).
+      write: (tenant, projectId, doc) => accounts.write(keys.accounts(tenant, projectId), doc),
       async create(tenant, projectId, input) { await project(tenant, projectId); return await accounts.create(keys.accounts(tenant, projectId), input, { tenant, projectId }); },
       update: (tenant, projectId, id, input) => accounts.update(keys.accounts(tenant, projectId), id, input, { tenant, projectId }),
       // Deleting an account that rules or charts use is refused unless force; the answer lists them.

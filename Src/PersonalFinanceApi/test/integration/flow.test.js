@@ -192,3 +192,38 @@ test("an import sample can come from Documents", async (t) => {
   assert.equal((await api.call("POST", `${T}/datasources/${ds.id}/sample`, { documentPath: "statements/missing.csv" })).status, 404);
   assert.equal((await api.call("POST", `${T}/datasources/${ds.id}/sample`, {})).status, 400);
 });
+
+test("categories: add, rename and delete apply to the project's accounts, charts and forecasts; projects clone", async (t) => {
+  const api = await startTestApi();
+  t.after(() => api.close());
+  const tenant = (await api.call("GET", "/v1/me")).body.tenants[0].id;
+  const T = `/v1/tenants/${tenant}`;
+  const project = (await api.call("POST", `${T}/projects`, { name: "Home" })).body;
+  const P = `${T}/projects/${project.id}`;
+  const pets = await api.call("POST", `${P}/categories`, { name: "Pets", type: "expense", inflation: 0.04 });
+  assert.equal(pets.status, 201, JSON.stringify(pets.body));
+  const vet = (await api.call("POST", `${P}/accounts`, { name: "Vet", category: "pets", shortCode: "VET" })).body;
+  await api.call("POST", `${P}/charts`, { name: "Pets", series: [{ name: "PETS", type: "category", ref: "pets" }] });
+  const forecast = (await api.call("POST", `${P}/forecasts`, { name: "Base", inflation: { pets: 0.1, food: 0.05 } })).body;
+  const renamed = await api.call("PUT", `${P}/categories/pets`, { name: "Animals", inflation: 0.05 });
+  assert.deepEqual([renamed.body.id, renamed.body.name], ["pets", "Animals"]);
+  assert.equal((await api.call("GET", P)).body.categories.find((c) => c.id === "pets").name, "Animals");
+  const removed = await api.call("DELETE", `${P}/categories/pets?moveTo=other`);
+  assert.equal(removed.status, 200, JSON.stringify(removed.body));
+  assert.deepEqual([removed.body.accounts, removed.body.charts.length, removed.body.forecasts], [[vet.id], 1, [forecast.id]]);
+  assert.equal((await api.call("GET", `${P}/accounts/${vet.id}`)).body.category, "other");
+  assert.equal((await api.call("GET", `${P}/charts/pets`)).body.series[0].ref, "other");
+  assert.deepEqual((await api.call("GET", `${P}/forecasts/${forecast.id}`)).body.inflation, { food: 0.05 });
+  assert.equal((await api.call("DELETE", `${P}/categories/nope`)).status, 404);
+  assert.equal((await api.call("DELETE", `${P}/categories/food?moveTo=food`)).status, 400);
+
+  const clone = await api.call("POST", `${P}/clone`, { name: "Home (what if)" });
+  assert.equal(clone.status, 201, JSON.stringify(clone.body));
+  const C = `${T}/projects/${clone.body.id}`;
+  assert.deepEqual((await api.call("GET", `${C}/accounts`)).body.items.map((a) => a.name).sort(), ["Uncategorised", "Vet"]);
+  assert.equal((await api.call("GET", `${C}/charts`)).body.items.length, 1);
+  assert.equal((await api.call("GET", `${C}/forecasts`)).body.items.length, 1);
+  assert.equal((await api.call("GET", `${T}/workspace`)).body.activeProject, clone.body.id);
+  await api.call("PUT", `${C}/categories/food`, { name: "Groceries" });
+  assert.equal((await api.call("GET", P)).body.categories.find((c) => c.id === "food").name, "Food", "the original is untouched");
+});

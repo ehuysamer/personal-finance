@@ -43,7 +43,8 @@ try {
   await start("node", [path.join(web, "node_modules/vite/bin/vite.js"), "--host", "127.0.0.1", "--port", String(webPort), "--strictPort"], web, { PERSONALFINANCE_API_URL: `http://127.0.0.1:${apiPort}` }, /Local:/);
   const browser = await chromium.launch();
   page = await browser.newPage({ ...devices["iPhone 13"] });
-  page.on("dialog", (dialog) => dialog.accept());
+  // confirm() is accepted; prompt() is answered by the step that expects it.
+  page.on("dialog", (dialog) => { if (dialog.type() !== "prompt") dialog.accept(); });
   const shot = async (name) => { if (shots) await page.screenshot({ path: path.join(shots, `${name}.png`), fullPage: true }); };
   await page.goto(`http://127.0.0.1:${webPort}/#/import`);
 
@@ -79,6 +80,24 @@ try {
     await page.getByRole("button", { name: "Save" }).click();
     await page.getByText(name, { exact: true }).waitFor();
   }
+  // Categories on the spot: add, rename (applies to its accounts), delete (its accounts move).
+  await page.getByRole("button", { name: "Category", exact: true }).click();
+  await page.getByPlaceholder("Pets").fill("Pets");
+  await page.getByRole("dialog").getByRole("button", { name: "Save" }).click();
+  await page.getByRole("button", { name: "Account", exact: true }).click();
+  await page.getByPlaceholder("Groceries").fill("Vet");
+  await page.getByLabel("Category").selectOption({ label: "Pets" });
+  await page.getByRole("dialog").getByRole("button", { name: "Save" }).click();
+  await page.getByRole("button", { name: "Rename Pets" }).click();
+  await page.getByPlaceholder("Pets").fill("Animals");
+  await page.getByRole("dialog").getByRole("button", { name: "Save" }).click();
+  await page.getByRole("heading", { name: /^Animals/ }).waitFor();
+  await page.getByRole("button", { name: "Delete Animals" }).click();
+  await page.getByRole("dialog").getByText("1 accounts are in this category").waitFor();
+  await page.getByRole("dialog").getByLabel("Move to").selectOption({ label: "Other" });
+  await page.getByRole("button", { name: "Delete category" }).click();
+  await page.getByText(/Deleted Animals: 1 accounts/).waitFor();
+  await page.locator("h3", { hasText: "Other" }).waitFor();
   await shot("3-accounts");
 
   // Analysis: a rule (tested), analyse, a chart, history.
@@ -167,6 +186,12 @@ try {
   await page.getByText("Sample: sample-drop-06.csv").waitFor();
   await page.getByText("1 rows, columns: Date, Details, Debit, Credit").waitFor();
   await shot("10-sample-sources");
+  // Clone the project: the copy becomes active, with the same accounts.
+  await page.getByRole("link", { name: "Accounts" }).click();
+  page.once("dialog", (dialog) => dialog.accept("Household (what if)"));
+  await page.getByRole("button", { name: "Clone project" }).click();
+  await page.getByRole("heading", { name: "Household (what if)" }).waitFor();
+  await page.getByText("Vet", { exact: true }).waitFor();
   await browser.close();
   console.log("e2e: passed");
 } catch (error) {

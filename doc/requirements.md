@@ -140,12 +140,18 @@ $tenants/{tenant}.json                      tenant and members
 
 ## 2. Projects and accounts
 
-- [C] Projects: add / edit / clone / delete. One project is always active (the user's choice, remembered per tenant);
+- [C] Projects: add / edit / clone / delete. **Clone** copies the settings, categories, accounts, rules, charts and
+      forecast definitions (not analysis or forecast results, jobs or deleted files); the copy becomes the active
+      project and is analysed afresh. One project is always active (the user's choice, remembered per tenant);
       from section 2 onwards every screen works in the active project, shown in the header. A tenant with no
       project is asked to create one before going further.
 - [C] A project names one or more datasources (of its tenant).
 - [C] A project has a **birth date** (a person's age, or a company's founding date) so ages can be shown and
       forecasts can run "until age 65".
+- [C] Categories are edited on the spot on the Accounts page, one at a time: **add**, **rename** (name, type,
+      inflation; accounts, charts and forecasts refer to a category by id, so the change shows everywhere) and
+      **delete** (its accounts and the chart series that total it move to a category the user picks; forecasts drop
+      its inflation override; the last category cannot be deleted). They stay on the project.
 - [C] A project has a list of **categories** (e.g. Income, Housing, Food, Transport), each with a type
       `income` | `expense` | `asset` | `liability` and a default inflation rate for forecasting.
 - [C] Accounts within a project: add / edit / delete; `name`, optional **short code** (unique in the project,

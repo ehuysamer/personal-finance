@@ -27,11 +27,11 @@ onMounted(async () => {
   if (state.route.parts[0] === "new-project" || !state.workspace.activeProject) newProject();
 });
 
-function newProject() { projectDraft.value = { name: "", datasources: datasources().map((item) => item.id), birthDate: "", categories: null }; }
+function newProject() { projectDraft.value = { name: "", datasources: datasources().map((item) => item.id), birthDate: "" }; }
 function editProject() { projectDraft.value = JSON.parse(JSON.stringify(project.value)); }
 async function saveProject() {
   const draft = projectDraft.value;
-  const body = { name: draft.name, description: draft.description, datasources: draft.datasources, birthDate: draft.birthDate || null, ...(draft.categories ? { categories: draft.categories.map((category) => ({ ...category, inflation: Number(category.inflation) / 100 })) } : {}) };
+  const body = { name: draft.name, description: draft.description, datasources: draft.datasources, birthDate: draft.birthDate || null };
   try {
     if (draft.id) await api.put(`${tenantPath()}/projects/${draft.id}`, body);
     else { const created = await api.post(`${tenantPath()}/projects`, body); await api.put(`${tenantPath()}/active-project`, { project: created.id }); }
@@ -46,8 +46,43 @@ async function deleteProject() {
   if (!confirm(`Delete project ${project.value.name}?`)) return;
   try { await api.del(projectPath()); await reloadWorkspace(); await load(); } catch (failure) { error.value = failure.message; }
 }
-// Categories are edited in percent; the API keeps fractions.
-function editCategories() { const draft = JSON.parse(JSON.stringify(project.value)); draft.categories = draft.categories.map((category) => ({ ...category, inflation: Math.round(category.inflation * 10000) / 100 })); projectDraft.value = draft; }
+// Categories, one at a time (inflation edited in percent; the API keeps fractions). A rename applies everywhere;
+// a delete moves the category's accounts (and the charts that total it) to another category.
+const categoryDraft = ref(null);
+const categoryDelete = ref(null);
+function newCategory() { categoryDraft.value = { name: "", type: "expense", inflation: 3 }; }
+function editCategory(category) { categoryDraft.value = { ...category, inflation: Math.round(category.inflation * 10000) / 100 }; }
+async function saveCategory() {
+  const draft = categoryDraft.value;
+  const body = { name: draft.name, type: draft.type, inflation: Number(draft.inflation || 0) / 100 };
+  try {
+    if (draft.id) await api.put(`${projectPath()}/categories/${draft.id}`, body); else await api.post(`${projectPath()}/categories`, body);
+    categoryDraft.value = null; toast("Category saved"); await load();
+  } catch (failure) { error.value = failure.message; }
+}
+function startDeleteCategory(category) {
+  const others = project.value.categories.filter((item) => item.id !== category.id);
+  if (!others.length) { error.value = "A project needs at least one category."; return; }
+  categoryDelete.value = { category, moveTo: (others.find((item) => item.type === category.type) || others[0]).id, accounts: accounts.value.filter((account) => account.category === category.id).length };
+}
+async function deleteCategory() {
+  const { category, moveTo } = categoryDelete.value;
+  try {
+    const result = await api.del(`${projectPath()}/categories/${category.id}`, { moveTo });
+    categoryDelete.value = null;
+    toast(`Deleted ${category.name}: ${result.accounts.length} accounts and ${result.charts.length} charts moved`);
+    await load();
+  } catch (failure) { error.value = failure.message; }
+}
+async function cloneProject() {
+  const name = prompt("Name of the copy", `${project.value.name} (copy)`);
+  if (!name) return;
+  try {
+    const copy = await api.post(`${projectPath()}/clone`, { name });
+    await reloadWorkspace();
+    toast(`${copy.name} is the active project: run Analyse on it`);
+  } catch (failure) { error.value = failure.message; }
+}
 
 function newAccount() { accountDraft.value = { name: "", category: project.value.categories[0]?.id, shortCode: "", tags: "", description: "" }; }
 function editAccount(account) { accountDraft.value = { ...account, tags: (account.tags || []).join(", ") }; }
@@ -78,7 +113,7 @@ const age = computed(() => { if (!project.value?.birthDate) return null; const m
     <p v-if="error" class="error">{{ error }}</p>
     <template v-if="project">
       <div class="spread"><h1>{{ project.name }}</h1>
-        <div class="row"><button class="icon ghost" aria-label="Edit project" @click="editProject"><Icon name="edit" /></button><button class="icon ghost" aria-label="New project" @click="newProject"><Icon name="plus" /></button></div>
+        <div class="row"><button class="icon ghost" aria-label="Edit project" title="Edit project" @click="editProject"><Icon name="edit" /></button><button class="icon ghost" aria-label="Clone project" title="Clone project" @click="cloneProject"><Icon name="copy" /></button><button class="icon ghost" aria-label="New project" title="New project" @click="newProject"><Icon name="plus" /></button></div>
       </div>
       <p class="muted small">
         Datasources: {{ project.datasources.map((id) => datasources().find((ds) => ds.id === id)?.name || id).join(", ") || "none" }}
@@ -86,7 +121,10 @@ const age = computed(() => { if (!project.value?.birthDate) return null; const m
       </p>
       <div class="spread"><h2>Accounts</h2><button class="primary" @click="newAccount"><Icon name="plus" /> Account</button></div>
       <template v-for="group in grouped" :key="group.category.id">
-        <h3>{{ group.category.name }} <span class="badge">{{ group.category.type }}</span> <span class="muted small">inflation {{ formatPercent(group.category.inflation) }}</span></h3>
+        <div class="spread" style="margin-top: 12px">
+          <h3 style="margin: 0">{{ group.category.name }} <span class="badge">{{ group.category.type }}</span> <span class="muted small">inflation {{ formatPercent(group.category.inflation) }}</span></h3>
+          <div class="row" style="gap: 0"><button class="icon ghost" :aria-label="`Rename ${group.category.name}`" @click="editCategory(group.category)"><Icon name="edit" /></button><button class="icon ghost" :aria-label="`Delete ${group.category.name}`" @click="startDeleteCategory(group.category)"><Icon name="trash" /></button></div>
+        </div>
         <ul class="list">
           <li v-for="account in group.accounts" :key="account.id" class="link" @click="editAccount(account)">
             <div class="grow"><div class="title">{{ account.name }}</div><div class="sub"><template v-if="account.shortCode">{{ account.shortCode }} · </template>{{ (account.tags || []).join(", ") || "no tags" }}</div></div>
@@ -95,7 +133,7 @@ const age = computed(() => { if (!project.value?.birthDate) return null; const m
           <li v-if="!group.accounts.length" class="empty">No accounts</li>
         </ul>
       </template>
-      <div class="row" style="margin-top: 16px"><button @click="editCategories">Edit categories</button><button class="danger" @click="deleteProject">Delete project</button></div>
+      <div class="row" style="margin-top: 16px"><button @click="newCategory"><Icon name="plus" /> Category</button><button class="danger" @click="deleteProject">Delete project</button></div>
     </template>
     <p v-else-if="!projectDraft" class="muted">No project yet.</p>
 
@@ -106,22 +144,25 @@ const age = computed(() => { if (!project.value?.birthDate) return null; const m
         <label v-for="item in datasources()" :key="item.id" class="check"><input v-model="projectDraft.datasources" type="checkbox" :value="item.id" />{{ item.name }}</label>
         <p v-if="!datasources().length" class="small muted">Create datasources in Import first.</p>
       </fieldset>
-      <template v-if="projectDraft.categories">
-        <h3>Categories</h3>
-        <div v-for="(category, index) in projectDraft.categories" :key="index" class="card">
-          <div class="grid2">
-            <label class="field"><span>Name</span><input v-model="category.name" /></label>
-            <label class="field"><span>Id</span><input v-model="category.id" :disabled="!!project?.categories.find((item) => item.id === category.id)" /></label>
-            <label class="field"><span>Type</span><select v-model="category.type"><option v-for="type in TYPES" :key="type" :value="type">{{ type }}</option></select></label>
-            <label class="field"><span>Inflation % per year</span><input v-model="category.inflation" type="number" step="0.1" inputmode="decimal" /></label>
-          </div>
-          <button class="danger" @click="projectDraft.categories.splice(index, 1)">Remove</button>
-        </div>
-        <button @click="projectDraft.categories.push({ id: '', name: '', type: 'expense', inflation: 3 })"><Icon name="plus" /> Category</button>
-      </template>
+      <p v-if="projectDraft.id" class="small muted">Categories are edited on the Accounts page.</p>
       <div class="row end" style="margin-top: 12px"><button class="primary" :disabled="!projectDraft.name" @click="saveProject">Save</button></div>
     </Sheet>
 
+    <Sheet v-if="categoryDraft" :title="categoryDraft.id ? `Edit ${categoryDraft.name || 'category'}` : 'New category'" @close="categoryDraft = null">
+      <label class="field"><span>Name</span><input v-model="categoryDraft.name" placeholder="Pets" /></label>
+      <div class="grid2">
+        <label class="field"><span>Type</span><select v-model="categoryDraft.type"><option v-for="type in TYPES" :key="type" :value="type">{{ type }}</option></select></label>
+        <label class="field"><span>Inflation % per year</span><input v-model="categoryDraft.inflation" type="number" step="0.1" inputmode="decimal" /></label>
+      </div>
+      <p v-if="categoryDraft.id" class="small muted">The new name shows everywhere the category is used: accounts, charts and forecasts.</p>
+      <div class="row end"><button class="primary" :disabled="!categoryDraft.name" @click="saveCategory">Save</button></div>
+    </Sheet>
+    <Sheet v-if="categoryDelete" :title="`Delete ${categoryDelete.category.name}`" @close="categoryDelete = null">
+      <p>{{ categoryDelete.accounts }} accounts are in this category. They, and any chart that totals it, move to:</p>
+      <label class="field"><span>Move to</span><select v-model="categoryDelete.moveTo"><option v-for="item in project.categories.filter((c) => c.id !== categoryDelete.category.id)" :key="item.id" :value="item.id">{{ item.name }}</option></select></label>
+      <p class="small muted">Forecasts drop their inflation override for this category.</p>
+      <div class="row end"><button class="danger" @click="deleteCategory">Delete category</button></div>
+    </Sheet>
     <Sheet v-if="accountDraft" :title="accountDraft.id ? 'Edit account' : 'New account'" @close="accountDraft = null">
       <label class="field"><span>Name</span><input v-model="accountDraft.name" placeholder="Groceries" /></label>
       <div class="grid2">
