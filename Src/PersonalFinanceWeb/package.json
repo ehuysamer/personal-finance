@@ -1,0 +1,22 @@
+{
+  "name": "personal-finance-web",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Personal finance web: mobile-first Vue site on S3 + CloudFront that calls the API with the user's sign-in",
+  "scripts": {
+    "dev": "vite --host 127.0.0.1 --port 5190",
+    "build": "vite build",
+    "preview": "vite preview --port 5190",
+    "test": "node --test test/unit/*.test.js",
+    "test:e2e": "node test/e2e/run.mjs",
+    "lint": "node --check src/lib/api.js && node --check src/lib/auth.js && node --check src/lib/format.js && node --check src/lib/chart.js"
+  },
+  "dependencies": {
+    "vue": "^3.5.45"
+  },
+  "devDependencies": {
+    "@vitejs/plugin-vue": "^6.0.10",
+    "vite": "^8.3.6"
+  }
+}

@@ -1,0 +1,23 @@
+const money = new Intl.NumberFormat("en-NZ", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+const compact = new Intl.NumberFormat("en-NZ", { notation: "compact", maximumFractionDigits: 1 });
+
+export function formatMoney(value) { return value === null || value === undefined || Number.isNaN(Number(value)) ? "" : money.format(Number(value)); }
+export function formatCompact(value) { return value === null || value === undefined ? "" : compact.format(Number(value)); }
+export function formatDate(text) {
+  if (!text) return "";
+  const date = new Date(`${String(text).slice(0, 10)}T00:00:00Z`);
+  return date.toLocaleDateString("en-NZ", { day: "numeric", month: "short", year: "numeric", timeZone: "UTC" });
+}
+export function formatPercent(value, digits = 1) { return value === null || value === undefined ? "" : `${(Number(value) * 100).toFixed(digits)}%`; }
+
+// Frequencies {n}{d|w|m|q|y} in words (1w -> "weekly", 6m -> "every 6 months").
+export function describeFrequency(text) {
+  const match = String(text || "").match(/^(\d+)([dwmqy])$/);
+  if (!match) return text || "";
+  const n = Number(match[1]);
+  const words = { d: ["daily", "days"], w: ["weekly", "weeks"], m: ["monthly", "months"], q: ["quarterly", "quarters"], y: ["yearly", "years"] }[match[2]];
+  return n === 1 ? words[0] : `every ${n} ${words[1]}`;
+}
+export function isFrequency(text) { return /^[1-9]\d{0,2}[dwmqy]$/.test(String(text || "").trim()); }
+
+export function slugHint(name) { return String(name || "").toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "").slice(0, 63); }
