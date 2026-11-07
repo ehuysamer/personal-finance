@@ -137,8 +137,9 @@ export default function createImportService({ store, indexService, workspaceServ
     return `${IMPORT(tenant)}${clean}`;
   }
   // Imports one file of the folder: into the datasource and importsource given, or the only ones that match.
-  async function importFromFolder(tenant, { path, datasource: ds, importsource, keep = false }) {
-    const key = folderKey(tenant, path);
+  // Imports a stored file (the import folder or a document) into the datasource and importsource given, or the only
+  // ones whose filename filters match.
+  async function importStored(tenant, key, { datasource: ds, importsource, label = key } = {}) {
     const name = cleanFilename(key.split("/").pop());
     let target = ds ? { datasource: ds, importsource } : null;
     if (!target) {
@@ -148,16 +149,22 @@ export default function createImportService({ store, indexService, workspaceServ
     }
     await datasource(tenant, target.datasource);
     let object;
-    try { object = await store.get(key); } catch (error) { if (error.statusCode === 404) throw new HttpError(404, "ERR-NOT-FOUND", `${path} is not in the import folder`); throw error; }
-    if (object.body.length > config.maxUploadBytes) throw new HttpError(413, "ERR-TOO-LARGE", `files are at most ${Math.round(config.maxUploadBytes / 1048576)} MB`);
+    try { object = await store.get(key); } catch (error) { if (error.statusCode === 404) throw new HttpError(404, "ERR-NOT-FOUND", `${label} was not found`); throw error; }
+    if (object.body.length > config.maxUploadBytes) throw new HttpError(413, "ERR-TOO-LARGE", `statements are at most ${Math.round(config.maxUploadBytes / 1048576)} MB`);
     const result = await importBuffer(tenant, target.datasource, name, object.body, target.importsource);
+    return { object, datasource: target.datasource, importsource: result.file?.importsource || target.importsource, ...result };
+  }
+
+  async function importFromFolder(tenant, { path, datasource: ds, importsource, keep = false }) {
+    const key = folderKey(tenant, path);
+    const { object, ...result } = await importStored(tenant, key, { datasource: ds, importsource, label: `${path} in the import folder` });
     let movedTo = null;
     if (!keep) {
       movedTo = `imported/${clock().toISOString().slice(0, 10)}/${path}`;
       await store.put(`${IMPORT(tenant)}${movedTo}`, object.body, { contentType: object.contentType || "application/octet-stream" });
       await store.delete(key);
     }
-    return { path, datasource: target.datasource, importsource: result.file?.importsource || target.importsource, movedTo, ...result };
+    return { path, movedTo, ...result };
   }
 
   async function deleteFile(tenant, ds, fileId) {
@@ -254,6 +261,6 @@ export default function createImportService({ store, indexService, workspaceServ
       match: matchImportsource,
       rebuild: (tenant, ds) => importsources.rebuild(folder(tenant, ds))
     },
-    files, sample, upload, uploadUrl, deleteFile, folderFiles, importFromFolder, manualTransactions, totals, datasourceTransactions, bankAccounts
+    files, sample, upload, uploadUrl, deleteFile, folderFiles, importFromFolder, importStored, candidatesFor, manualTransactions, totals, datasourceTransactions, bankAccounts
   };
 }

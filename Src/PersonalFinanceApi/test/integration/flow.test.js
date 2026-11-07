@@ -146,3 +146,35 @@ test("the tenant import folder: listed with matching importsources, imported, th
   const escape = await api.call("POST", `${T}/import-folder/import`, { path: "../other/x.csv" });
   assert.equal(escape.status, 400);
 });
+
+test("documents: upload into folders, list, move, download, import a statement (it stays), delete", async (t) => {
+  const api = await startTestApi();
+  t.after(() => api.close());
+  const tenant = (await api.call("GET", "/v1/me")).body.tenants[0].id;
+  const T = `/v1/tenants/${tenant}`;
+  const ds = (await api.call("POST", `${T}/datasources`, { name: "Visa" })).body;
+  const translators = { date: { parts: [{ type: "column", column: "Date" }], format: "dd/MM/yyyy" }, account: { parts: [{ type: "fixed", value: "Visa" }] }, description: { parts: [{ type: "column", column: "Details" }] }, amount: { parts: [{ type: "column", column: "Amount" }] } };
+  await api.call("POST", `${T}/datasources/${ds.id}/importsources`, { name: "Visa CSV", format: "csv", filenameFilter: "visa-*.csv", translators });
+  const csv = Buffer.from("Date,Details,Amount\n02/01/2026,Cafe,-5\n").toString("base64");
+  assert.equal((await api.call("POST", `${T}/documents`, { path: "statements/2026/visa-jan.csv", contentBase64: csv })).status, 201);
+  assert.equal((await api.call("POST", `${T}/documents`, { path: "receipts/fridge.pdf", contentBase64: Buffer.from("%PDF-1.4").toString("base64") })).body.contentType, "application/pdf");
+  assert.equal((await api.call("POST", `${T}/documents`, { path: "../escape.txt", contentBase64: csv })).status, 400);
+  const top = await api.call("GET", `${T}/documents`);
+  assert.deepEqual([top.body.folders, top.body.files.length], [["receipts", "statements"], 0]);
+  assert.deepEqual((await api.call("GET", `${T}/documents?folder=statements/2026`)).body.files.map((file) => file.name), ["visa-jan.csv"]);
+  assert.equal((await api.call("GET", `${T}/documents?q=fridge`)).body.files.length, 1);
+  const candidates = await api.call("GET", `${T}/documents/candidates?path=statements/2026/visa-jan.csv`);
+  assert.deepEqual(candidates.body.candidates.map((c) => c.datasource), [ds.id]);
+  const imported = await api.call("POST", `${T}/documents/import`, { path: "statements/2026/visa-jan.csv" });
+  assert.equal(imported.status, 201, JSON.stringify(imported.body));
+  assert.equal(imported.body.added, 1);
+  assert.equal((await api.call("GET", `${T}/datasources/${ds.id}/files`)).body.items[0].filename, "visa-jan.csv");
+  assert.equal((await api.call("GET", `${T}/documents?folder=statements/2026`)).body.files.length, 1, "the document stays");
+  await api.call("PUT", `${T}/documents/move`, { path: "receipts/fridge.pdf", to: "home/fridge receipt.pdf" });
+  const download = await api.call("GET", `${T}/documents/download?path=${encodeURIComponent("home/fridge receipt.pdf")}`);
+  assert.equal(Buffer.from(download.body.contentBase64, "base64").toString(), "%PDF-1.4");
+  await api.call("DELETE", `${T}/documents?path=${encodeURIComponent("home/fridge receipt.pdf")}`);
+  assert.deepEqual((await api.call("GET", `${T}/documents`)).body.folders, ["statements"]);
+  const rebuilt = await api.call("POST", `${T}/indexes/rebuild`);
+  assert.equal(rebuilt.body.documents, 1);
+});

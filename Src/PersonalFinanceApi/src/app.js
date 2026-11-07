@@ -16,8 +16,9 @@ export function createApp(deps) {
   const { config } = deps;
   const app = express();
   app.disable("x-powered-by");
-  // Uploads are base64 in JSON: a 10 MB file is about 13.4 MB of text.
-  app.use(express.json({ limit: Math.ceil(config.maxUploadBytes * 1.4) + 65536 }));
+  // Uploads are base64 in JSON: a 10 MB file is about 13.4 MB of text. (On Lambda a request is at most 6 MB, so
+  // larger files use presigned uploads; this limit matters locally.)
+  app.use(express.json({ limit: Math.ceil(Math.max(config.maxUploadBytes, config.maxDocumentBytes) * 1.4) + 65536 }));
   app.use((req, res, next) => {
     req.requestId = randomUUID();
     // The web is on its own host (CloudFront) and calls the API directly.

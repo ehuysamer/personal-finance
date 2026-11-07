@@ -78,6 +78,7 @@ $tenants/{tenant}.json                      tenant and members
 {tenant}/{datasource}/$uploads/{uploadId}/{filename}    large uploads, removed once imported
 {tenant}/$users/{sha256(email)}.json         a user's preferences (active project)
 {tenant}/import/...                         the import folder; imported files move to import/imported/{yyyy-mm-dd}/
+{tenant}/documents/$index.json, {folder}/{name}   documents (any files the user keeps)
 ```
 
 - [C] Indexes (`$index.json`) are lists of things (tenants, projects, datasources, importsources, files, accounts,
@@ -224,6 +225,22 @@ value(t) = replay(t) + base_real × (1 + g)^t × s(m) × (1 + i_category)^t  [+ 
       value, or a slope per year), each with an optional start and end (date or age) and its own frequency.
 - [C] Each forecast run writes `model.json` with the model terms found per account (shown on the Model tab), so the
       user can see why.
+
+## 5. Documents
+
+- [C] A **Documents** section (fifth in the navigation): any files the user keeps (statements, PDFs, scans), in
+      folders, at `{tenant}/documents/` with `documents/$index.json` listing them (path, size, type, SHA-256, dates).
+- [C] Drag and drop files or whole folders anywhere on the page (folders keep their structure below the current
+      folder), or choose files (phones). Up to 25 MB each; over 3 MB they go straight to the bucket with a presigned
+      URL. The same path again replaces a document.
+- [C] Browse folders (breadcrumbs), search every document by path, new folder, download (a short-lived link), move or
+      rename, delete (soft).
+- [C] **Import from documents:** a statement (CSV, Excel, JSON) can be imported from Documents (into the datasource
+      and importsource whose filename filter matches, or one the user picks) or from a datasource's Files tab
+      ("From documents"). The document stays in Documents. MCP: `documents_list`, `document_upload(_url)`,
+      `document_download`, `document_move`, `document_delete`, `document_import_candidates`, `document_import`.
+- [C] `documents` is not allowed as a project or datasource id; `indexes_rebuild` also rebuilds the documents list
+      (e.g. after files were copied in with `aws s3 cp`).
 
 ## Long-running jobs
 

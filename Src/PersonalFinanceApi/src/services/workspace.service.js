@@ -65,7 +65,9 @@ export default function createWorkspaceService({ store, indexService, clock = ()
   }
   async function create(tenant, kind, input) {
     const taken = new Set((await list(tenant)).map((item) => item.id));
+    // The tenant's own folders.
     taken.add("import");
+    taken.add("documents");
     const id = input.id ? assertId(input.id, `${kind} id`) : uniqueId(input.name, taken, kind);
     if (taken.has(id) || await store.exists(keys.meta(tenant, id))) throw new HttpError(409, "ERR-EXISTS", `${id} is already used by a project or datasource`);
     const now = clock().toISOString();
@@ -106,7 +108,7 @@ export default function createWorkspaceService({ store, indexService, clock = ()
     const { folders } = await store.listChildren(`${tenant}/`);
     const items = [];
     for (const folder of folders) {
-      if (folder.startsWith("$") || folder === "import") continue;
+      if (folder.startsWith("$") || folder === "import" || folder === "documents") continue;
       try { items.push(summary(await getJson(store, keys.meta(tenant, folder)))); } catch (error) { if (error.statusCode !== 404) throw error; }
     }
     await indexService.replace(keys.tenantIndex(tenant), items);

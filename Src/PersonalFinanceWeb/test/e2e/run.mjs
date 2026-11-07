@@ -122,6 +122,22 @@ try {
   await shot("7-forecast-chart");
   await page.getByRole("button", { name: "Model" }).click();
   await page.getByText(/SALARY ACME: 5,000.00 monthly/).waitFor();
+
+  // Documents: add a statement, see it, import it (it stays), and find it from a datasource's Files tab.
+  await page.getByRole("link", { name: "Documents" }).click();
+  await page.getByRole("heading", { name: "Documents" }).waitFor();
+  await page.locator("input[type=file]").setInputFiles(fixture);
+  await page.getByText("sample-statement.csv: saved").waitFor();
+  await page.getByRole("button", { name: "Import", exact: true }).click();
+  await page.getByRole("dialog").getByRole("button", { name: "Import", exact: true }).click();
+  await page.getByText(/already imported|imported again into|imported into/).waitFor();
+  await shot("8-documents-import");
+  await page.getByRole("dialog").getByLabel("Close").click();
+  await page.getByRole("link", { name: "Import" }).click();
+  await page.getByText("ASB everyday").click();
+  await page.getByRole("button", { name: "From documents" }).click();
+  await page.getByRole("dialog").getByText("sample-statement.csv").first().waitFor();
+  await shot("9-from-documents");
   await browser.close();
   console.log("e2e: passed");
 } catch (error) {

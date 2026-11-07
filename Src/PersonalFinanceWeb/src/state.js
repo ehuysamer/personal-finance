@@ -15,7 +15,7 @@ export const state = reactive({
 
 export function parseRoute(hash = location.hash) {
   const parts = hash.replace(/^#\/?/, "").split("/").filter(Boolean).map(decodeURIComponent);
-  const section = ["import", "accounts", "analysis", "forecast", "settings"].includes(parts[0]) ? parts[0] : "import";
+  const section = ["import", "accounts", "analysis", "forecast", "documents"].includes(parts[0]) ? parts[0] : "import";
   return { section, parts: parts.slice(1) };
 }
 export function go(section, ...parts) { location.hash = `#/${[section, ...parts].map(encodeURIComponent).join("/")}`; }

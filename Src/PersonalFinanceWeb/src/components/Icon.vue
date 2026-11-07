@@ -2,6 +2,7 @@
 defineProps({ name: { type: String, required: true } });
 const paths = {
   upload: "M12 16V4m0 0l-4 4m4-4l4 4M4 16v3a1 1 0 001 1h14a1 1 0 001-1v-3",
+  document: "M7 3h7l5 5v12a1 1 0 01-1 1H7a1 1 0 01-1-1V4a1 1 0 011-1zm7 0v5h5",
   folder: "M3 7a2 2 0 012-2h4l2 2h8a2 2 0 012 2v8a2 2 0 01-2 2H5a2 2 0 01-2-2V7z",
   chart: "M4 19h16M7 16V9m5 7V5m5 11v-4",
   trend: "M4 17l5-5 4 3 7-8m0 0h-5m5 0v5",

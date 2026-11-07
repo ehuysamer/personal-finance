@@ -14,6 +14,8 @@ const defaults = {
   localUserEmail: "ehuysamer@gmail.com",
   maxUploadBytes: 10 * 1024 * 1024,
   maxRowsPerFile: 200000,
+  // Documents (any file the user keeps: statements, PDFs, scans).
+  maxDocumentBytes: 25 * 1024 * 1024,
   // Long-running jobs (analysis, forecasts): a worker saves and re-invokes itself when less than
   // jobSafetyMs of its time is left; a job past maxJobMs or maxJobInvocations stops with ERR-JOB-LIMIT.
   maxJobMs: 30 * 60 * 1000,

@@ -26,6 +26,26 @@ const uploads = ref([]);
 const choose = ref(null);
 const cloneOf = ref(null);
 const totalDraft = ref(null);
+const fromDocuments = ref(null);
+async function openDocuments() {
+  fromDocuments.value = { q: "", files: [], results: {} };
+  await searchDocuments();
+}
+async function searchDocuments() {
+  const files = (await api.get(`${tenantPath()}/documents`, { q: fromDocuments.value.q, recursive: true })).files;
+  fromDocuments.value.files = files.filter((file) => /\.(csv|json|xlsx)$/i.test(file.name));
+}
+async function importDocument(file) {
+  const view = fromDocuments.value;
+  view.results[file.path] = "importing…";
+  try {
+    const result = await api.post(`${tenantPath()}/documents/import`, { path: file.path, datasource: current.value });
+    view.results[file.path] = result.status === "already-imported" ? `already imported as ${result.sameAs}` : `${result.status}: ${result.added} added, ${result.alreadyPresent} already there`;
+    await load();
+  } catch (failure) {
+    view.results[file.path] = failure.code === "ERR-IMPORTSOURCE-CHOICE" ? "no importsource of this datasource matches the name; import it from Documents and choose one" : failure.message;
+  }
+}
 const manualDraft = ref(null);
 
 const D = () => `${tenantPath()}/datasources/${current.value}`;
@@ -178,6 +198,7 @@ const bankNames = computed(() => banks.value.map((bank) => bank.account).filter(
       <div class="card">
         <label class="field"><span>Upload statements</span><input type="file" multiple accept=".csv,.json,.xlsx" @change="upload([...$event.target.files]); $event.target.value = ''" /></label>
         <p v-if="!sources.length" class="small muted">Set up an importsource first (the Importsources tab).</p>
+        <button @click="openDocuments"><Icon name="document" /> From documents</button>
         <p v-for="entry in uploads" :key="entry.name + entry.status" class="small" :class="{ neg: !entry.ok }">{{ entry.name }}: {{ entry.status }}</p>
       </div>
       <ul class="list">
@@ -241,6 +262,16 @@ const bankNames = computed(() => banks.value.map((bank) => bank.account).filter(
       <TransactionList :path="`${D()}/transactions`" :show-running="false" />
     </div>
 
+    <Sheet v-if="fromDocuments" title="Import from documents" @close="fromDocuments = null">
+      <input v-model="fromDocuments.q" type="search" placeholder="Search documents" aria-label="Search documents" @input="searchDocuments" />
+      <ul class="list" style="margin-top: 8px">
+        <li v-for="file in fromDocuments.files" :key="file.path">
+          <div class="grow"><div class="title">{{ file.name }}</div><div class="sub">{{ fromDocuments.results[file.path] || file.path }}</div></div>
+          <button v-if="!fromDocuments.results[file.path]" @click="importDocument(file)">Import</button>
+        </li>
+        <li v-if="!fromDocuments.files.length" class="empty">No statements (CSV, Excel, JSON) in documents</li>
+      </ul>
+    </Sheet>
     <Sheet v-if="choose" title="Which importsource?" @close="choose = null">
       <p class="small">{{ choose.file.name }}</p>
       <ul class="list">

@@ -6,6 +6,7 @@ import ImportView from "./views/ImportView.vue";
 import AccountsView from "./views/AccountsView.vue";
 import AnalysisView from "./views/AnalysisView.vue";
 import ForecastView from "./views/ForecastView.vue";
+import DocumentsView from "./views/DocumentsView.vue";
 
 const api = inject("api");
 const auth = inject("auth");
@@ -14,7 +15,8 @@ const sections = [
   { id: "import", label: "Import", icon: "upload" },
   { id: "accounts", label: "Accounts", icon: "folder" },
   { id: "analysis", label: "Analysis", icon: "chart" },
-  { id: "forecast", label: "Forecast", icon: "trend" }
+  { id: "forecast", label: "Forecast", icon: "trend" },
+  { id: "documents", label: "Documents", icon: "document" }
 ];
 
 async function loadWorkspace() {
@@ -33,7 +35,7 @@ async function chooseProject(id) {
   toast("Active project changed");
 }
 
-const needsProject = computed(() => state.route.section !== "import" && !state.workspace.activeProject);
+const needsProject = computed(() => !["import", "documents"].includes(state.route.section) && !state.workspace.activeProject);
 const projectList = computed(() => projects());
 
 onMounted(async () => {
@@ -96,6 +98,7 @@ onMounted(async () => {
       <ImportView v-else-if="state.route.section === 'import'" :key="`i-${state.tenant}`" />
       <AccountsView v-else-if="state.route.section === 'accounts'" :key="`a-${state.tenant}-${state.workspace.activeProject}`" />
       <AnalysisView v-else-if="state.route.section === 'analysis'" :key="`n-${state.tenant}-${state.workspace.activeProject}`" />
+      <DocumentsView v-else-if="state.route.section === 'documents'" :key="`d-${state.tenant}`" />
       <ForecastView v-else-if="state.route.section === 'forecast'" :key="`f-${state.tenant}-${state.workspace.activeProject}`" />
     </main>
   </template>

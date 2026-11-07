@@ -34,7 +34,7 @@ header.top { position: sticky; top: 0; z-index: 20; background: var(--surface); 
 header.top .brand { font-weight: 650; display: flex; align-items: center; gap: 6px; margin-right: auto; white-space: nowrap; }
 header.top select { max-width: 42vw; }
 
-nav.bottom { position: fixed; bottom: 0; left: 0; right: 0; z-index: 20; height: calc(var(--nav-h) + env(safe-area-inset-bottom)); padding-bottom: env(safe-area-inset-bottom); background: var(--surface); border-top: 1px solid var(--border); display: grid; grid-template-columns: repeat(4, 1fr); }
+nav.bottom { position: fixed; bottom: 0; left: 0; right: 0; z-index: 20; height: calc(var(--nav-h) + env(safe-area-inset-bottom)); padding-bottom: env(safe-area-inset-bottom); background: var(--surface); border-top: 1px solid var(--border); display: grid; grid-template-columns: repeat(5, 1fr); }
 nav.bottom a { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; color: var(--muted); text-decoration: none; font-size: .75rem; }
 nav.bottom a.active { color: var(--accent); font-weight: 600; }
 nav.bottom svg { width: 22px; height: 22px; }
@@ -101,3 +101,12 @@ th { background: var(--surface-2); font-weight: 600; position: sticky; top: 0; }
 .progress { height: 6px; background: var(--surface-2); border-radius: 999px; overflow: hidden; }
 .progress > div { height: 100%; background: var(--accent); transition: width .3s; }
 .center { min-height: 60vh; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; gap: 12px; padding: 24px; }
+
+label.button { display: inline-flex; align-items: center; gap: 6px; min-height: 42px; padding: 8px 14px; border-radius: var(--radius); border: 1px solid var(--border); cursor: pointer; }
+label.button.primary { background: var(--accent); border-color: var(--accent); color: var(--accent-text); font-weight: 600; }
+.dropzone { min-height: 60vh; border: 2px dashed transparent; border-radius: 12px; margin: -6px; padding: 6px; transition: border-color .15s, background .15s; }
+.dropzone.dragging { border-color: var(--accent); background: var(--accent-soft); }
+.list > li.stack { flex-wrap: wrap; row-gap: 2px; }
+.list > li.stack > .grow { flex: 1 1 100%; }
+.list > li.stack > .actions { margin-left: auto; display: flex; gap: 2px; }
+@media (min-width: 640px) { .list > li.stack { flex-wrap: nowrap; } .list > li.stack > .grow { flex: 1 1 auto; } }

@@ -39,5 +39,7 @@ export default class S3ObjectStore {
   }
   // A short-lived URL the browser PUTs a file to (uploads larger than a Lambda request allows).
   async uploadUrl(key, { expiresIn = 900, contentType = "application/octet-stream" } = {}) { return await getSignedUrl(this.client, new PutObjectCommand({ Bucket: this.bucket, Key: key, ContentType: contentType }), { expiresIn }); }
+  // A short-lived link to download a file (documents), saved under its own name.
+  async downloadUrl(key, { expiresIn = 300, filename } = {}) { return await getSignedUrl(this.client, new GetObjectCommand({ Bucket: this.bucket, Key: key, ResponseContentDisposition: filename ? `attachment; filename*=UTF-8''${encodeURIComponent(filename)}` : undefined }), { expiresIn }); }
   async delete(key) { await this.client.send(new DeleteObjectCommand({ Bucket: this.bucket, Key: key })); }
 }
