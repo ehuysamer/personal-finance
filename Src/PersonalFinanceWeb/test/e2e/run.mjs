@@ -103,7 +103,7 @@ try {
   // Analysis: a rule (tested), analyse, a chart, history.
   await page.getByRole("link", { name: "Analysis" }).click();
   await page.getByRole("button", { name: "Rules" }).click();
-  for (const [name, account, value] of [["Salary", "Salary", "salary"], ["Supermarkets", "Groceries", "countdown, new world"], ["Rent", "Rent", "rent"]]) {
+  for (const [name, account, value] of [["Salary", "Salary", "salary"], ["Supermarkets", "Groceries", "countdown, new world"]]) {
     await page.getByRole("button", { name: "Rule", exact: true }).click();
     await page.getByPlaceholder("Supermarkets").fill(name);
     await page.getByLabel("Into account").selectOption({ label: account });
@@ -118,6 +118,18 @@ try {
   await page.getByRole("button", { name: "Analyse" }).click();
   await page.getByText("Last analysed").waitFor({ timeout: 20000 });
   await page.getByText("15,000.00").waitFor();
+  // Rent matched no rule: add one from the unmatched list (pre-filled), then analyse again.
+  await page.getByRole("heading", { name: /Not matched by any rule 3/ }).waitFor();
+  await page.getByRole("button", { name: "Add rule" }).first().click();
+  const sheet = page.getByRole("dialog", { name: "New rule" });
+  if (await sheet.getByPlaceholder("Supermarkets").inputValue() !== "Rent") throw new Error("the rule name was not pre-filled");
+  if (await sheet.getByLabel("Value", { exact: true }).inputValue() !== "Rent") throw new Error("the condition was not pre-filled");
+  await sheet.getByText("3 transactions match").waitFor();
+  await sheet.getByLabel("Into account").selectOption({ label: "Rent" });
+  await shot("4b-rule-from-unmatched");
+  await sheet.getByRole("button", { name: "Save" }).click();
+  await page.getByRole("button", { name: "Analyse again" }).click();
+  await page.getByRole("heading", { name: /Not matched by any rule 0/ }).waitFor({ timeout: 20000 });
   await shot("4-analysis");
   await page.getByRole("button", { name: "Charts" }).click();
   await page.getByRole("button", { name: "New chart" }).click();
@@ -168,9 +180,8 @@ try {
   await page.getByText("ASB everyday").click();
   // Several statements dropped at once on the Files tab are all imported.
   await dropFiles(page, "div.dropzone", [statement("04"), statement("05")]);
-  // Their names match no filename filter: one choice imports both.
-  await page.getByRole("dialog", { name: "Which importsource for 2 files?" }).getByText("sample-statement", { exact: true }).click();
-  for (const day of ["04", "05"]) await page.getByText(new RegExp(`sample-drop-${day}.csv: imported`)).waitFor();
+  // Their names match no filename filter: the datasource's importsource reads them anyway.
+  for (const day of ["04", "05"]) await page.getByText(new RegExp(`sample-drop-${day}.csv: imported: 1 added, 0 already there \\(read by sample-statement\\)`)).waitFor();
   await page.getByRole("button", { name: "From documents" }).click();
   await page.getByRole("dialog").getByText("sample-statement.csv").first().waitFor();
   await shot("9-from-documents");

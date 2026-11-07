@@ -83,21 +83,41 @@ export default function createImportService({ store, indexService, workspaceServ
     return await importBuffer(tenant, ds, name, buffer, importsource);
   }
 
+  // Why an importsource read no rows from a file, in words.
+  function nothingRead(table, rejected) {
+    if (!table.rows.length) return "the file has no data rows (check the lines to skip, the header row, the sheet or the rows path)";
+    return `all ${table.rows.length} rows were rejected: ${rejected[0].errors.join("; ")}`;
+  }
+
+  // Reads a file with the importsource given, then the ones whose filename filter matches, then the datasource's
+  // others, until one reads at least one row. attempts lists the ones that read nothing, and why.
+  async function readWithFallback(tenant, ds, name, buffer, preferred) {
+    const all = await importsources.list(folder(tenant, ds));
+    if (!all.length) throw new HttpError(409, "ERR-NO-IMPORTSOURCE", "this datasource has no importsource yet: set one up (Importsources) to read its statements");
+    if (preferred) await importsources.get(folder(tenant, ds), preferred);
+    const order = [...new Set([preferred, ...all.filter((item) => filenameMatches(item.filenameFilter, name)).map((item) => item.id), ...all.map((item) => item.id)].filter(Boolean))];
+    const attempts = [];
+    for (const id of order) {
+      const definition = await importsources.get(folder(tenant, ds), id);
+      let table;
+      try { table = parseFile(buffer, definition.format, definition.options, { maxRows: config.maxRowsPerFile }); }
+      catch (error) { if (error.code === "ERR-TOO-MANY-ROWS") throw error; attempts.push({ importsource: id, name: definition.name, reason: error.message }); continue; }
+      const { rows, rejected } = translateRows(table.rows, definition.translators);
+      if (rows.length) return { definition, rows, rejected, attempts };
+      attempts.push({ importsource: id, name: definition.name, reason: nothingRead(table, rejected) });
+    }
+    throw new HttpError(422, "ERR-NOTHING-READ", `Nothing was imported from ${name}: ${attempts.map((attempt) => `${attempt.name}: ${attempt.reason}`).join(". ")}`, { attempts });
+  }
+
+  // Imports a file into a datasource. When it adds nothing, reason says why.
   async function importBuffer(tenant, ds, name, buffer, importsource) {
     if (buffer.length > config.maxUploadBytes) throw new HttpError(413, "ERR-TOO-LARGE", `files are at most ${Math.round(config.maxUploadBytes / 1048576)} MB`);
-    let sourceId = importsource;
-    if (!sourceId) {
-      const matches = await matchImportsource(tenant, ds, name);
-      if (matches.length !== 1) throw new HttpError(409, "ERR-IMPORTSOURCE-CHOICE", matches.length ? "several importsources match this filename; choose one" : "no importsource matches this filename; choose one", { candidates: matches.map((item) => ({ id: item.id, name: item.name })) });
-      sourceId = matches[0].id;
-    }
-    const definition = await importsources.get(folder(tenant, ds), sourceId);
     const sha256 = createHash("sha256").update(buffer).digest("hex");
     const existing = await files(tenant, ds);
     const sameContent = existing.find((file) => file.sha256 === sha256 && file.filename !== name);
-    if (sameContent) return { status: "already-imported", filename: name, sameAs: sameContent.filename, added: 0, alreadyPresent: sameContent.rows };
-    const table = parseFile(buffer, definition.format, definition.options, { maxRows: config.maxRowsPerFile });
-    const { rows, rejected } = translateRows(table.rows, definition.translators);
+    if (sameContent) return { status: "already-imported", filename: name, sameAs: sameContent.filename, added: 0, alreadyPresent: sameContent.rows, reason: `the same file was already imported as ${sameContent.filename}` };
+    const { definition, rows, rejected, attempts } = await readWithFallback(tenant, ds, name, buffer, importsource);
+    const sourceId = definition.id;
     const previous = existing.find((file) => file.filename === name);
     const others = [];
     for (const file of existing) if (file.id !== previous?.id) others.push({ rows: await fileRows(tenant, ds, file) });
@@ -108,7 +128,10 @@ export default function createImportService({ store, indexService, workspaceServ
     const dates = rows.map((row) => row.date).sort();
     const entry = { id: fileId, filename: name, size: buffer.length, sha256, importsource: sourceId, rows: rows.length, rejected: rejected.length, firstDate: dates[0] || null, lastDate: dates.at(-1) || null, importedAt: previous?.importedAt || clock().toISOString(), updatedAt: clock().toISOString(), status: "imported" };
     await updateJson(store, keys.filesIndex(tenant, ds), (index) => ({ items: [...index.items.filter((file) => file.id !== fileId), entry], updatedAt: clock().toISOString() }), { items: [] });
-    return { status: previous ? "replaced" : "imported", file: entry, ...report, rejected: rejected.slice(0, 20), rejectedCount: rejected.length };
+    const result = { status: previous ? "replaced" : "imported", file: entry, importsource: sourceId, importsourceName: definition.name, ...report, rejected: rejected.slice(0, 20), rejectedCount: rejected.length, ...(attempts.length ? { triedFirst: attempts } : {}) };
+    if (!report.added) result.reason = report.alreadyPresent ? `all ${report.alreadyPresent} transactions are already in this datasource (from earlier statements)` : "no transactions were read";
+    if (rejected.length) result.reason = `${result.reason ? `${result.reason}; ` : ""}${rejected.length} rows were rejected (first: row ${rejected[0].row}, ${rejected[0].errors.join("; ")})`;
+    return result;
   }
 
   // The tenant's import folder ({tenant}/import/, data/{tenant}/import/ offline): files dropped there (S3 console,
@@ -142,18 +165,24 @@ export default function createImportService({ store, indexService, workspaceServ
   // ones whose filename filters match.
   async function importStored(tenant, key, { datasource: ds, importsource, label = key } = {}) {
     const name = cleanFilename(key.split("/").pop());
-    let target = ds ? { datasource: ds, importsource } : null;
-    if (!target) {
-      const candidates = await candidatesFor(tenant, name);
-      if (candidates.length !== 1) throw new HttpError(409, "ERR-IMPORTSOURCE-CHOICE", candidates.length ? "several importsources match this filename; choose one" : "no importsource matches this filename; choose a datasource and importsource", { candidates });
-      target = candidates[0];
-    }
-    await datasource(tenant, target.datasource);
+    let targets = ds ? [{ datasource: ds, importsource }] : await candidatesFor(tenant, name);
+    if (!targets.length) throw new HttpError(409, "ERR-IMPORTSOURCE-CHOICE", "no importsource's filename filter matches this file; choose a datasource", { candidates: [] });
+    targets = targets.filter((target, i) => targets.findIndex((other) => other.datasource === target.datasource) === i);
     let object;
     try { object = await store.get(key); } catch (error) { if (error.statusCode === 404) throw new HttpError(404, "ERR-NOT-FOUND", `${label} was not found`); throw error; }
     if (object.body.length > config.maxUploadBytes) throw new HttpError(413, "ERR-TOO-LARGE", `statements are at most ${Math.round(config.maxUploadBytes / 1048576)} MB`);
-    const result = await importBuffer(tenant, target.datasource, name, object.body, target.importsource);
-    return { object, datasource: target.datasource, importsource: result.file?.importsource || target.importsource, ...result };
+    const failures = [];
+    for (const target of targets) {
+      await datasource(tenant, target.datasource);
+      try {
+        const result = await importBuffer(tenant, target.datasource, name, object.body, target.importsource);
+        return { object, datasource: target.datasource, importsource: result.importsource || target.importsource, ...result };
+      } catch (error) {
+        if (error.code !== "ERR-NOTHING-READ" || targets.length === 1) throw error;
+        failures.push(...error.data.attempts.map((attempt) => ({ ...attempt, datasource: target.datasource })));
+      }
+    }
+    throw new HttpError(422, "ERR-NOTHING-READ", `Nothing was imported from ${name}: ${failures.map((attempt) => `${attempt.datasource}/${attempt.name}: ${attempt.reason}`).join(". ")}`, { attempts: failures });
   }
 
   async function importFromFolder(tenant, { path, datasource: ds, importsource, keep = false }) {

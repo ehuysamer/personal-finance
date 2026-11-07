@@ -21,3 +21,15 @@ export function describeFrequency(text) {
 export function isFrequency(text) { return /^[1-9]\d{0,2}[dwmqy]$/.test(String(text || "").trim()); }
 
 export function slugHint(name) { return String(name || "").toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "").slice(0, 63); }
+
+// An import's outcome in words: how many were added, which importsource read it (and which read nothing first),
+// and, when nothing was added, why.
+export function describeImport(result, { into } = {}) {
+  if (result.status === "already-imported") return `nothing imported: ${result.reason || `already imported as ${result.sameAs}`}`;
+  const verb = result.status === "replaced" ? "imported again" : "imported";
+  let text = `${verb}${into ? ` into ${into}` : ""}: ${result.added} added, ${result.alreadyPresent} already there`;
+  if (result.importsourceName) text += ` (read by ${result.importsourceName}${result.triedFirst?.length ? ` after ${result.triedFirst.map((attempt) => attempt.name).join(", ")} read nothing` : ""})`;
+  if (!result.added && result.reason) text += `. Nothing new: ${result.reason}`;
+  else if (result.rejectedCount) text += `. ${result.rejectedCount} rows rejected`;
+  return text;
+}

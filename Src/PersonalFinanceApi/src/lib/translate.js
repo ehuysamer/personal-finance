@@ -76,7 +76,7 @@ export function validateTranslators(translators) {
   for (const field of TARGET_FIELDS) {
     const definition = translators?.[field] || { parts: [] };
     const parts = (Array.isArray(definition.parts) ? definition.parts : []).map((part, i) => {
-      if (part.type === "fixed") return { type: "fixed", value: String(part.value ?? "") };
+      if (part.type === "fixed") return { type: "fixed", value: String(part.value ?? ""), ...(part.negate ? { negate: true } : {}) };
       if (part.type === "column" && String(part.column || "")) return { type: "column", column: String(part.column), ...(part.negate ? { negate: true } : {}) };
       throw new HttpError(400, "ERR-TRANSLATOR", `${field} part ${i + 1}: type is column (with a column) or fixed (with a value)`);
     });

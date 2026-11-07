@@ -35,10 +35,21 @@ async function load() {
 onMounted(load);
 
 async function analyse() {
-  error.value = "";
+  error.value = ""; rulesChanged.value = false;
   try { jobId.value = (await api.post(`${projectPath()}/analysis`)).id; } catch (failure) { error.value = failure.message; }
 }
-async function jobDone(job) { toast(`Analysis ${job.status}`); status.value = await api.get(`${projectPath()}/analysis`); }
+async function jobDone(job) { toast(`Analysis ${job.status}`); status.value = await api.get(`${projectPath()}/analysis`); unmatchedKey.value += 1; }
+
+// Transactions no rule matched: each can start a rule, pre-filled with its beneficiary words.
+const unmatchedKey = ref(0);
+const unmatchedCount = computed(() => status.value?.accounts?.find((item) => item.id === "uncategorised")?.count || 0);
+const rulesChanged = ref(false);
+function ruleFromTransaction(tx) {
+  const suggestion = tx.suggestedRule;
+  ruleDraft.value = { name: suggestion.name, account: accounts.value.find((account) => !account.builtIn)?.id, enabled: true, conditions: suggestion.conditions.map((condition) => ({ ...condition })), date: { start: "", end: "" }, amount: { min: "", max: "" }, example: suggestion.example };
+  testResult.value = null;
+  testRule();
+}
 
 const accountName = (id) => accounts.value.find((account) => account.id === id)?.name || id;
 const accountSummary = computed(() => (status.value?.accounts || []).map((item) => ({ ...item, name: accountName(item.id) })).sort((a, b) => Math.abs(b.running) - Math.abs(a.running)));
@@ -55,7 +66,7 @@ async function saveRule() {
   try {
     const { id, order: _o, ...rest } = body();
     if (id) await api.put(`${projectPath()}/rules/${id}`, rest); else await api.post(`${projectPath()}/rules`, rest);
-    ruleDraft.value = null; toast("Rule saved; analyse to apply it"); await load();
+    ruleDraft.value = null; rulesChanged.value = true; toast("Rule saved; analyse to apply it"); await load();
   } catch (failure) { error.value = failure.message; }
 }
 async function deleteRule() { if (!confirm("Delete this rule?")) return; await api.del(`${projectPath()}/rules/${ruleDraft.value.id}`); ruleDraft.value = null; await load(); }
@@ -90,6 +101,11 @@ async function moveRule(index, delta) {
         </li>
         <li v-if="!accountSummary.length" class="empty">Not analysed yet</li>
       </ul>
+      <template v-if="status?.finishedAt">
+        <div class="spread"><h2>Not matched by any rule <span class="badge">{{ unmatchedCount }}</span></h2><button v-if="rulesChanged" class="primary" :disabled="!!jobId" @click="analyse"><Icon name="play" /> Analyse again</button></div>
+        <p class="muted small">These went to Uncategorised. Add a rule to put them (and others like them) into an account.</p>
+        <TransactionList :key="unmatchedKey" :path="`${projectPath()}/unmatched`" :show-running="false" action-label="Add rule" @action="ruleFromTransaction" />
+      </template>
     </div>
 
     <div v-if="tab === 'rules'">
@@ -120,6 +136,7 @@ async function moveRule(index, delta) {
         <label class="field"><span>Into account</span><select v-model="ruleDraft.account"><option v-for="account in accounts" :key="account.id" :value="account.id">{{ account.name }}</option></select></label>
       </div>
       <label class="check"><input v-model="ruleDraft.enabled" type="checkbox" />Enabled</label>
+      <p v-if="ruleDraft.example" class="card small">From: {{ ruleDraft.example.description }} · {{ formatDate(ruleDraft.example.date) }} · {{ formatMoney(ruleDraft.example.amount) }}</p>
       <h3>All of these</h3>
       <div v-for="(condition, index) in ruleDraft.conditions" :key="index" class="card">
         <div class="grid2">

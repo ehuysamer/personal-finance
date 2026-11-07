@@ -16,7 +16,7 @@ const TARGETS = [
   { id: "date", label: "Date", hint: "One or more columns read as a date" },
   { id: "account", label: "Account", hint: "The bank account; often a fixed value" },
   { id: "description", label: "Description", hint: "Parts are joined in order" },
-  { id: "amount", label: "Amount", hint: "Parts are added: credit, and debit with the sign flipped" }
+  { id: "amount", label: "Amount", hint: "Parts are added; − negates a part (e.g. Credit + and Debit −)" }
 ];
 const DATE_FORMATS = ["auto", "dd/MM/yyyy", "d/M/yyyy", "MM/dd/yyyy", "yyyy-MM-dd", "dd-MM-yyyy", "dd.MM.yyyy", "yyyyMMdd", "yyyy/MM/dd", "dd MMM yyyy", "d MMM yyyy", "MMM d, yyyy", "dd/MM/yy", "excel"];
 
@@ -159,13 +159,13 @@ async function save() {
     <div v-for="target in TARGETS" :key="target.id" class="card">
       <div class="spread"><strong>{{ target.label }}</strong><span class="muted small">{{ target.hint }}</span></div>
       <div v-for="(part, index) in draft.translators[target.id].parts" :key="index" class="part">
+        <button v-if="target.id === 'amount'" class="sign" :class="{ negate: part.negate }" :aria-label="part.negate ? 'Negated: tap to add as is' : 'Added as is: tap to negate'" :title="part.negate ? 'Negated (e.g. a debit column)' : 'Added as is'" @click="part.negate = !part.negate">{{ part.negate ? "−" : "+" }}</button>
         <select v-model="part.type" aria-label="Part type"><option value="column">Column</option><option value="fixed">Fixed</option></select>
         <select v-if="part.type === 'column'" v-model="part.column" aria-label="Column">
           <option v-for="column in columns" :key="column" :value="column">{{ column }}</option>
           <option v-if="part.column && !columns.includes(part.column)" :value="part.column">{{ part.column }}</option>
         </select>
         <input v-else v-model="part.value" aria-label="Fixed value" placeholder="value" />
-        <label v-if="target.id === 'amount' && part.type === 'column'" class="check small" title="Flip the sign (debit columns)"><input v-model="part.negate" type="checkbox" />flip sign</label>
         <button class="icon ghost" :disabled="index === 0" aria-label="Move up" @click="move(target.id, index, -1)"><Icon name="up" /></button>
         <button class="icon ghost" :disabled="index === draft.translators[target.id].parts.length - 1" aria-label="Move down" @click="move(target.id, index, 1)"><Icon name="down" /></button>
         <button class="icon ghost" aria-label="Remove" @click="draft.translators[target.id].parts.splice(index, 1)"><Icon name="trash" /></button>

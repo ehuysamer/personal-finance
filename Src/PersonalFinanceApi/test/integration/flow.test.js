@@ -35,7 +35,11 @@ test("import, analyse, chart and forecast end to end", async (t) => {
   const again = await api.call("POST", `${D}/files`, { filename: "asb-march.csv", contentBase64: b64(MARCH) });
   assert.equal(again.body.status, "replaced");
   const copy = await api.call("POST", `${D}/files`, { filename: "march-copy.csv", contentBase64: b64(MARCH) });
-  assert.equal(copy.status, 409, "no importsource matches the copy's name");
+  assert.equal(copy.body.status, "already-imported", "no filename filter matches, the datasource's importsource reads it, and it is the March file");
+  assert.equal(copy.body.reason, "the same file was already imported as asb-march.csv");
+  const again2 = await api.call("POST", `${D}/files`, { filename: "asb-april-again.csv", contentBase64: b64(APRIL + "\n") });
+  assert.deepEqual([again2.body.added, again2.body.reason], [0, "all 3 transactions are already in this datasource (from earlier statements)"]);
+  await api.call("DELETE", `${D}/files/${again2.body.file.id}`);
   const sameContent = await api.call("POST", `${D}/files`, { filename: "asb-march-2.csv", contentBase64: b64(MARCH) });
   assert.equal(sameContent.body.status, "already-imported");
   const txs = await api.call("GET", `${D}/transactions`);
@@ -226,4 +230,48 @@ test("categories: add, rename and delete apply to the project's accounts, charts
   assert.equal((await api.call("GET", `${T}/workspace`)).body.activeProject, clone.body.id);
   await api.call("PUT", `${C}/categories/food`, { name: "Groceries" });
   assert.equal((await api.call("GET", P)).body.categories.find((c) => c.id === "food").name, "Food", "the original is untouched");
+});
+
+
+test("an importsource that reads nothing hands the file to the next; nothing read says why", async (t) => {
+  const api = await startTestApi();
+  t.after(() => api.close());
+  const tenant = (await api.call("GET", "/v1/me")).body.tenants[0].id;
+  const D = `/v1/tenants/${tenant}/datasources/${(await api.call("POST", `/v1/tenants/${tenant}/datasources`, { name: "Bank" })).body.id}`;
+  const csv = (header, row) => Buffer.from(`${header}\n${row}\n`).toString("base64");
+  const fixed = (columns) => ({ date: { parts: [{ type: "column", column: columns[0] }], format: "dd/MM/yyyy" }, account: { parts: [{ type: "fixed", value: "Bank" }] }, description: { parts: [{ type: "column", column: columns[1] }] }, amount: { parts: [{ type: "column", column: columns[2] }] } });
+  assert.equal((await api.call("POST", `${D}/files`, { filename: "bank-jan.csv", contentBase64: csv("Date,Details,Amount", "02/01/2026,Cafe,-5") })).body.code, "ERR-NO-IMPORTSOURCE");
+  await api.call("POST", `${D}/importsources`, { name: "Old layout", format: "csv", filenameFilter: "bank-*.csv", translators: fixed(["When", "What", "Value"]) });
+  await api.call("POST", `${D}/importsources`, { name: "New layout", format: "csv", translators: fixed(["Date", "Details", "Amount"]) });
+  const imported = await api.call("POST", `${D}/files`, { filename: "bank-jan.csv", contentBase64: csv("Date,Details,Amount", "02/01/2026,Cafe,-5") });
+  assert.equal(imported.status, 201, JSON.stringify(imported.body));
+  assert.deepEqual([imported.body.importsourceName, imported.body.added, imported.body.triedFirst[0].name], ["New layout", 1, "Old layout"]);
+  assert.match(imported.body.triedFirst[0].reason, /all 1 rows were rejected: date "" does not read/);
+  const nothing = await api.call("POST", `${D}/files`, { filename: "bank-feb.csv", contentBase64: csv("Foo,Bar", "1,2") });
+  assert.equal(nothing.status, 422);
+  assert.equal(nothing.body.code, "ERR-NOTHING-READ");
+  assert.equal(nothing.body.data.attempts.length, 2);
+  assert.match(nothing.body.message, /^Nothing was imported from bank-feb.csv: Old layout: all 1 rows were rejected/);
+  const empty = await api.call("POST", `${D}/files`, { filename: "bank-mar.csv", contentBase64: Buffer.from("Date,Details,Amount\n").toString("base64") });
+  assert.match(empty.body.message, /the file has no data rows/);
+});
+
+test("after analysis, unmatched transactions come with a suggested rule that matches them", async (t) => {
+  const api = await startTestApi();
+  t.after(() => api.close());
+  const tenant = (await api.call("GET", "/v1/me")).body.tenants[0].id;
+  const T = `/v1/tenants/${tenant}`;
+  const ds = (await api.call("POST", `${T}/datasources`, { name: "Bank" })).body;
+  await api.call("POST", `${T}/datasources/${ds.id}/manual-transactions`, { date: "2026-01-02", account: "A", description: "POS W/D PAK N SAVE ALB-14:22", amount: -50 });
+  const project = (await api.call("POST", `${T}/projects`, { name: "Home", datasources: [ds.id] })).body;
+  const P = `${T}/projects/${project.id}`;
+  await api.call("POST", `${P}/analysis`);
+  await api.drain();
+  const unmatched = await api.call("GET", `${P}/unmatched?pageSize=10`);
+  assert.equal(unmatched.body.total, 1);
+  const rule = unmatched.body.items[0].suggestedRule;
+  assert.deepEqual([rule.name, rule.conditions], ["Pak N Save", [{ field: "description", op: "contains", value: "PAK N SAVE" }]]);
+  const food = (await api.call("POST", `${P}/accounts`, { name: "Groceries", category: "food" })).body;
+  const tested = await api.call("POST", `${P}/rules-test`, { rule: { ...rule, account: food.id } });
+  assert.equal(tested.body.count, 1, "the suggestion matches the transaction it came from");
 });

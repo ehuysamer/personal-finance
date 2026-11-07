@@ -2,7 +2,7 @@
 import { computed, inject, ref, watch } from "vue";
 import { readBase64 } from "../lib/api.js";
 import { filesFromDrop } from "../lib/drop.js";
-import { formatDate } from "../lib/format.js";
+import { describeImport, formatDate } from "../lib/format.js";
 import { go, state, tenantPath, toast } from "../state.js";
 import Icon from "../components/Icon.vue";
 import Sheet from "../components/Sheet.vue";
@@ -91,7 +91,7 @@ async function runImport() {
   job.result = "importing…";
   try {
     const result = await api.post(`${tenantPath()}/documents/import`, { path: job.file.path, ...(pick ? { datasource: pick.datasource, importsource: pick.importsource } : job.datasource ? { datasource: job.datasource } : {}) });
-    job.result = result.status === "already-imported" ? `already imported as ${result.sameAs}` : `${result.status === "replaced" ? "imported again" : "imported"} into ${result.datasource}: ${result.added} added, ${result.alreadyPresent} already there`;
+    job.result = describeImport(result, { into: result.datasource });
   } catch (failure) { job.result = failure.message; }
 }
 const datasourceOptions = computed(() => state.workspace.items.filter((item) => item.kind === "datasource"));

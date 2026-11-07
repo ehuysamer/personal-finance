@@ -52,3 +52,27 @@ export function createCategoriser(rules) {
     return { account: UNCATEGORISED, rule: null };
   };
 }
+
+// A rule suggested from a transaction no rule matched: the beneficiary part of its description, matched with
+// "contains". It is the longest run of words (at most four) without digits or bank noise (POS, EFTPOS, CARD, AP#...),
+// taken exactly as written so the condition matches the transaction it came from.
+const NOISE = /^(pos|eftpos|card|visa|debit|credit|tfr|transfer|to|from|ref|reference|ap|dd|w\/d|bp|dc|fee|int|direct)$/i;
+export function suggestRule(tx) {
+  const text = String(tx.description || "");
+  const tokens = [...text.matchAll(/\S+/g)].map((match) => ({ word: match[0], start: match.index, end: match.index + match[0].length }));
+  const keep = (token) => !/\d/.test(token.word) && !NOISE.test(token.word.replace(/[#:]+$/, "")) && /\p{L}/u.test(token.word);
+  let best = [];
+  for (let i = 0; i < tokens.length; i += 1) {
+    if (!keep(tokens[i])) continue;
+    let j = i;
+    while (j < tokens.length && keep(tokens[j])) j += 1;
+    if (j - i > best.length) best = tokens.slice(i, j);
+    i = j;
+  }
+  best = best.slice(0, 4);
+  let value = best.length ? text.slice(best[0].start, best.at(-1).end).replace(/[^\p{L}\p{N})']+$/u, "").replace(/^[^\p{L}\p{N}(]+/u, "") : "";
+  if (!value) value = text.trim();
+  const conditions = value ? [{ field: "description", op: "contains", value }] : (tx.bankAccount ? [{ field: "account", op: "exact", value: tx.bankAccount }] : []);
+  const name = value ? value.toLowerCase().replace(/(^|\s)\p{L}/gu, (letter) => letter.toUpperCase()) : "New rule";
+  return { name, conditions, date: { start: null, end: null }, amount: { min: null, max: null }, example: { date: tx.date, description: tx.description, amount: tx.amount } };
+}

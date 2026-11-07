@@ -2,7 +2,7 @@
 import { computed, inject, ref, watch } from "vue";
 import { readBase64 } from "../lib/api.js";
 import { filesFromDrop } from "../lib/drop.js";
-import { formatDate, formatMoney } from "../lib/format.js";
+import { describeImport, formatDate, formatMoney } from "../lib/format.js";
 import { datasources, go, state, tenantPath, toast } from "../state.js";
 import Icon from "../components/Icon.vue";
 import Sheet from "../components/Sheet.vue";
@@ -46,10 +46,10 @@ async function importDocument(file) {
   view.results[file.path] = "importing…";
   try {
     const result = await api.post(`${tenantPath()}/documents/import`, { path: file.path, datasource: current.value });
-    view.results[file.path] = result.status === "already-imported" ? `already imported as ${result.sameAs}` : `${result.status}: ${result.added} added, ${result.alreadyPresent} already there`;
+    view.results[file.path] = describeImport(result);
     await load();
   } catch (failure) {
-    view.results[file.path] = failure.code === "ERR-IMPORTSOURCE-CHOICE" ? "no importsource of this datasource matches the name; import it from Documents and choose one" : failure.message;
+    view.results[file.path] = failure.message;
   }
 }
 const manualDraft = ref(null);
@@ -69,7 +69,7 @@ async function importFromFolder(item) {
   folderResults.value[item.path] = "importing…";
   try {
     const result = await api.post(`${tenantPath()}/import-folder/import`, { path: item.path, ...(pick ? { datasource: pick.datasource, importsource: pick.importsource } : {}) });
-    folderResults.value[item.path] = result.status === "already-imported" ? `already imported as ${result.sameAs}` : `${result.status} into ${result.datasource}: ${result.added} added, ${result.alreadyPresent} already there`;
+    folderResults.value[item.path] = describeImport(result, { into: result.datasource });
   } catch (failure) { folderResults.value[item.path] = failure.message; }
 }
 async function importAllMatched() {
@@ -117,8 +117,8 @@ async function upload(list, importsource) {
         body.uploadId = target.uploadId;
       } else body.contentBase64 = await readBase64(file);
       const result = await api.post(`${D()}/files`, body);
-      entry.status = result.status === "already-imported" ? `already imported as ${result.sameAs}` : `${result.status}: ${result.added} added, ${result.alreadyPresent} already there${result.rejectedCount ? `, ${result.rejectedCount} rows rejected` : ""}`;
-      entry.ok = true;
+      entry.status = describeImport(result);
+      entry.ok = result.added > 0;
     } catch (failure) {
       // Files no filename filter decides wait together; one choice imports them all.
       if (failure.code === "ERR-IMPORTSOURCE-CHOICE") {

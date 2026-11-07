@@ -2,7 +2,7 @@ import HttpError from "../models/httpError.model.js";
 import { EXPRESSION_HELP } from "../lib/chartExpression.js";
 import { DATE_FORMATS, TARGET_FIELDS } from "../lib/translate.js";
 import { TEXT_OPERATORS } from "../lib/match.js";
-import { RULE_FIELDS } from "../lib/rules.js";
+import { RULE_FIELDS, UNCATEGORISED, suggestRule } from "../lib/rules.js";
 import { METHODS } from "../lib/forecastModel.js";
 import { GENERATOR_TYPES } from "../lib/generators.js";
 
@@ -128,6 +128,11 @@ export const operations = [
     const candidate = { order: Number.MAX_SAFE_INTEGER, ...(args.rule.id ? rules.find((rule) => rule.id === args.rule.id) : {}), ...args.rule };
     return deps.projectService.rules.test(transactions, rules, candidate, Number(args.limit) || 50);
   } },
+  { name: "unmatched_transactions", method: "get", path: `${PP}/unmatched`, scope: "project", description: "After analysis: the transactions no rule matched (the uncategorised account), paged, newest first, each with a suggested rule (name and a description condition) to fill in and save with rule_create", input: { page: N, pageSize: N, q: S, sort: S, order: S }, run: async ({ tenant, project, deps, args }) => {
+    const page = await deps.resultsService.history(tenant, project, "analysis", UNCATEGORISED, args);
+    return { ...page, items: page.items.map((tx) => ({ ...tx, suggestedRule: suggestRule(tx) })) };
+  } },
+  { name: "rule_suggest", method: "post", path: `${PP}/rules-suggest`, scope: "project", description: "A suggested rule for a transaction ({ description, bankAccount?, date?, amount? }): its beneficiary words as a description condition", input: { transaction: O }, required: ["transaction"], run: async ({ args }) => suggestRule(args.transaction || {}) },
   { name: "analysis_run", method: "post", path: `${PP}/analysis`, scope: "project", status: 202, description: "Analyse: put the project's transactions into accounts by the rules and build running totals and aggregates. Runs as a job; follow it with job_get", run: ({ tenant, project, deps, user }) => deps.jobService.start(tenant, project, "analysis", {}, user) },
   { name: "analysis_status", method: "get", path: `${PP}/analysis`, scope: "project", description: "The last analysis: when, counts per account, last date, warnings", run: async ({ tenant, project, deps }) => (await deps.analysisService.meta(tenant, project)) || { status: "none" } },
   { name: "account_aggregates", method: "get", path: `${PP}/accounts/:account/aggregates`, scope: "project", description: "An account's monthly, quarterly and yearly sum, running total, count, average, min and max (analysis, or a forecast)", input: { forecast: S }, run: async ({ tenant, project, deps, args }) => (await deps.resultsService.aggregates(tenant, project, args.forecast ? deps.forecastService.scope(args.forecast) : "analysis", args.account)) || { account: args.account, monthly: [], quarterly: [], yearly: [] } },

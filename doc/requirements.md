@@ -116,7 +116,16 @@ $tenants/{tenant}.json                      tenant and members
       a source column, or a fixed (hardcoded) value. Several parts are joined (text: with a separator, default
       space; amount: added, so debit and credit columns can make one amount, each with an optional sign flip).
       The order can be changed. Date parts take a format (`dd/MM/yyyy`, Excel serial, ...).
+- [C] Each amount part has a **+ / −** toggle: − negates it (Credit + and Debit − make one signed amount); fixed values
+      too.
 - [C] The mapping preview shows the normalised rows for the sample before saving.
+- [C] **Fallback:** a file is read with the importsource given, then those whose filename filter matches, then the
+      datasource's other importsources, until one reads at least one row (the answer names it and the ones that read
+      nothing first). From Documents or the import folder without a datasource, each datasource whose filters match is
+      tried in turn.
+- [C] **Why nothing was imported:** every import that adds nothing says why: the same file was already imported, all
+      its transactions are already there, every importsource read no rows (each with its reason: no data rows, or all
+      rows rejected with the first error), or the datasource has no importsource yet.
 - [C] Clone an importsource (then configure it), or clone it into another datasource (move = clone then delete).
 
 ### Duplicates
@@ -170,6 +179,11 @@ $tenants/{tenant}.json                      tenant and members
       `containsall` and `containsany` (several entries), `not` flag, case-insensitive by default.
 - [C] Date range (optional start, optional end) and amount range (optional minimum, optional maximum).
 - [C] "Test rule" shows which transactions it would match (and which earlier rule takes them instead).
+- [C] After analysis, **Not matched by any rule** lists the transactions that went to Uncategorised (paged, newest
+      first, searchable), each with **Add rule**: the rule sheet opens pre-filled with a name and a "description
+      contains" condition taken from the beneficiary words of its description (a run of up to four words without
+      digits or bank noise such as POS, EFTPOS, CARD, AP#, exactly as written so it matches), and is tested at once.
+      After saving, **Analyse again** applies it. MCP: `unmatched_transactions` (with `suggestedRule`), `rule_suggest`.
 
 ### Running analysis
 
