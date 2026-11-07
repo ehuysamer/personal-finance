@@ -1,6 +1,7 @@
 <script setup>
 import { computed, inject, ref, watch } from "vue";
 import { readBase64 } from "../lib/api.js";
+import { filesFromDrop } from "../lib/drop.js";
 import { formatDate } from "../lib/format.js";
 import { go, state, tenantPath, toast } from "../state.js";
 import Icon from "../components/Icon.vue";
@@ -31,29 +32,9 @@ function search() {
   timer = setTimeout(async () => { results.value = q.value ? (await api.get(`${tenantPath()}/documents`, { q: q.value })).files : null; }, 250);
 }
 
-// Dropped folders are read entry by entry so their files keep their place below the current folder.
-async function entriesOf(item) {
-  const entry = item.webkitGetAsEntry?.();
-  if (!entry) { const file = item.getAsFile(); return file ? [{ file, path: file.name }] : []; }
-  const out = [];
-  async function walk(node, prefix) {
-    if (node.isFile) { out.push({ file: await new Promise((resolve, reject) => node.file(resolve, reject)), path: `${prefix}${node.name}` }); return; }
-    const reader = node.createReader();
-    for (;;) {
-      const batch = await new Promise((resolve, reject) => reader.readEntries(resolve, reject));
-      if (!batch.length) break;
-      for (const child of batch) await walk(child, `${prefix}${node.name}/`);
-    }
-  }
-  await walk(entry, "");
-  return out;
-}
 async function onDrop(event) {
   dragging.value = false;
-  const items = [...(event.dataTransfer?.items || [])].filter((item) => item.kind === "file");
-  const files = [];
-  for (const item of items) files.push(...await entriesOf(item));
-  await upload(files);
+  await upload(await filesFromDrop(event.dataTransfer));
 }
 async function upload(files) {
   for (const { file, path } of files) {

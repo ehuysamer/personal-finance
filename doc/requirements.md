@@ -99,6 +99,8 @@ $tenants/{tenant}.json                      tenant and members
       datasources and importsources whose filename filters match; the user imports one, or all files with exactly one
       match (`npm run import -- <tenant> --folder` offline). An imported file moves to
       `import/imported/{yyyy-mm-dd}/`. `import` is therefore not allowed as a project or datasource id.
+- [C] Several files can be dropped at once (drag and drop on a datasource's Files tab, as well as choosing them).
+      Files whose names match no importsource's filename filter wait together, and one choice imports them all.
 - [C] Files are uploaded in the web (several at once, also from the phone) or from `data/import/`. Each upload picks
       its importsource by the filename filters (below); when none or several match, the user chooses.
 

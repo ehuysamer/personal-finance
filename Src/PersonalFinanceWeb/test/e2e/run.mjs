@@ -28,6 +28,14 @@ function start(command, args, cwd, env, ready) {
   });
 }
 const shots = process.env.E2E_SHOTS || "";
+// Drops several made-up files at once on an element (a real DataTransfer with File objects, as a browser builds it).
+async function dropFiles(page, selector, files) {
+  await page.locator(selector).first().evaluate((element, list) => {
+    const data = new DataTransfer();
+    for (const { name, text } of list) data.items.add(new File([text], name, { type: "text/csv" }));
+    element.dispatchEvent(new DragEvent("drop", { dataTransfer: data, bubbles: true, cancelable: true }));
+  }, files);
+}
 let failed = false;
 let page;
 try {
@@ -128,13 +136,22 @@ try {
   await page.getByRole("heading", { name: "Documents" }).waitFor();
   await page.locator("input[type=file]").setInputFiles(fixture);
   await page.getByText("sample-statement.csv: saved").waitFor();
-  await page.getByRole("button", { name: "Import", exact: true }).click();
+  // Several files dropped at once are all saved.
+  const statement = (day) => ({ name: `sample-drop-${day}.csv`, text: `Date,Details,Debit,Credit\n${day}/04/2026,Drop ${day},1.00,\n` });
+  await dropFiles(page, "section.dropzone", [statement("01"), statement("02"), statement("03")]);
+  for (const day of ["01", "02", "03"]) await page.getByText(`sample-drop-${day}.csv: saved`).waitFor();
+  await page.locator("li", { hasText: "sample-statement.csv" }).getByRole("button", { name: "Import", exact: true }).click();
   await page.getByRole("dialog").getByRole("button", { name: "Import", exact: true }).click();
   await page.getByText(/already imported|imported again into|imported into/).waitFor();
   await shot("8-documents-import");
   await page.getByRole("dialog").getByLabel("Close").click();
   await page.getByRole("link", { name: "Import" }).click();
   await page.getByText("ASB everyday").click();
+  // Several statements dropped at once on the Files tab are all imported.
+  await dropFiles(page, "div.dropzone", [statement("04"), statement("05")]);
+  // Their names match no filename filter: one choice imports both.
+  await page.getByRole("dialog", { name: "Which importsource for 2 files?" }).getByText("sample-statement", { exact: true }).click();
+  for (const day of ["04", "05"]) await page.getByText(new RegExp(`sample-drop-${day}.csv: imported`)).waitFor();
   await page.getByRole("button", { name: "From documents" }).click();
   await page.getByRole("dialog").getByText("sample-statement.csv").first().waitFor();
   await shot("9-from-documents");

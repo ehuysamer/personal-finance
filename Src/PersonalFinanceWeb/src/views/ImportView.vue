@@ -1,6 +1,7 @@
 <script setup>
 import { computed, inject, ref, watch } from "vue";
 import { readBase64 } from "../lib/api.js";
+import { filesFromDrop } from "../lib/drop.js";
 import { formatDate, formatMoney } from "../lib/format.js";
 import { datasources, go, state, tenantPath, toast } from "../state.js";
 import Icon from "../components/Icon.vue";
@@ -27,6 +28,11 @@ const choose = ref(null);
 const cloneOf = ref(null);
 const totalDraft = ref(null);
 const fromDocuments = ref(null);
+const dragging = ref(false);
+async function onDrop(event) {
+  dragging.value = false;
+  await upload((await filesFromDrop(event.dataTransfer)).map((item) => item.file));
+}
 async function openDocuments() {
   fromDocuments.value = { q: "", files: [], results: {} };
   await searchDocuments();
@@ -114,11 +120,23 @@ async function upload(list, importsource) {
       entry.status = result.status === "already-imported" ? `already imported as ${result.sameAs}` : `${result.status}: ${result.added} added, ${result.alreadyPresent} already there${result.rejectedCount ? `, ${result.rejectedCount} rows rejected` : ""}`;
       entry.ok = true;
     } catch (failure) {
-      if (failure.code === "ERR-IMPORTSOURCE-CHOICE") { entry.status = failure.message; choose.value = { file, candidates: failure.data?.candidates?.length ? failure.data.candidates : sources.value }; }
+      // Files no filename filter decides wait together; one choice imports them all.
+      if (failure.code === "ERR-IMPORTSOURCE-CHOICE") {
+        entry.status = "waiting for an importsource";
+        const candidates = failure.data?.candidates?.length ? failure.data.candidates : sources.value;
+        if (choose.value) { choose.value.files.push(file); if (candidates.length < choose.value.candidates.length) choose.value.candidates = candidates; }
+        else choose.value = { files: [file], candidates };
+      }
       else entry.status = failure.message;
     }
   }
   await load();
+}
+async function chooseImportsource(importsource) {
+  const files = choose.value.files;
+  choose.value = null;
+  uploads.value = uploads.value.filter((entry) => !(entry.status === "waiting for an importsource" && files.some((file) => file.name === entry.name)));
+  await upload(files, importsource);
 }
 async function removeFile(file) {
   if (!confirm(`Remove ${file.filename} and its ${file.rows} rows?`)) return;
@@ -194,9 +212,9 @@ const bankNames = computed(() => banks.value.map((bank) => bank.account).filter(
       <button v-for="item in [['files', 'Files'], ['sources', 'Importsources'], ['banks', 'Balances'], ['manual', 'Manual'], ['transactions', 'Transactions']]" :key="item[0]" :class="{ on: tab === item[0] }" @click="tab = item[0]">{{ item[1] }}</button>
     </div>
 
-    <div v-if="tab === 'files'">
+    <div v-if="tab === 'files'" class="dropzone" :class="{ dragging }" @dragover.prevent="dragging = true" @dragleave.self="dragging = false" @drop.prevent="onDrop">
       <div class="card">
-        <label class="field"><span>Upload statements</span><input type="file" multiple accept=".csv,.json,.xlsx" @change="upload([...$event.target.files]); $event.target.value = ''" /></label>
+        <label class="field"><span>Upload statements (or drop several files anywhere here)</span><input type="file" multiple accept=".csv,.json,.xlsx" @change="upload([...$event.target.files]); $event.target.value = ''" /></label>
         <p v-if="!sources.length" class="small muted">Set up an importsource first (the Importsources tab).</p>
         <button @click="openDocuments"><Icon name="document" /> From documents</button>
         <p v-for="entry in uploads" :key="entry.name + entry.status" class="small" :class="{ neg: !entry.ok }">{{ entry.name }}: {{ entry.status }}</p>
@@ -272,10 +290,10 @@ const bankNames = computed(() => banks.value.map((bank) => bank.account).filter(
         <li v-if="!fromDocuments.files.length" class="empty">No statements (CSV, Excel, JSON) in documents</li>
       </ul>
     </Sheet>
-    <Sheet v-if="choose" title="Which importsource?" @close="choose = null">
-      <p class="small">{{ choose.file.name }}</p>
+    <Sheet v-if="choose" :title="choose.files.length > 1 ? `Which importsource for ${choose.files.length} files?` : 'Which importsource?'" @close="choose = null">
+      <p class="small">{{ choose.files.map((file) => file.name).join(", ") }}</p>
       <ul class="list">
-        <li v-for="item in choose.candidates" :key="item.id" class="link" @click="upload([choose.file], item.id); choose = null"><div class="grow title">{{ item.name }}</div><Icon name="chevron" /></li>
+        <li v-for="item in choose.candidates" :key="item.id" class="link" @click="chooseImportsource(item.id)"><div class="grow title">{{ item.name }}</div><Icon name="chevron" /></li>
       </ul>
     </Sheet>
     <Sheet v-if="cloneOf" :title="`Clone ${cloneOf.name}`" @close="cloneOf = null">
