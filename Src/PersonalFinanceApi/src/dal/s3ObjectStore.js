@@ -1,4 +1,5 @@
 import { DeleteObjectCommand, GetObjectCommand, HeadObjectCommand, ListObjectsV2Command, PutObjectCommand, S3Client } from "@aws-sdk/client-s3";
+import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 import HttpError from "../models/httpError.model.js";
 
 async function toBuffer(body) {
@@ -36,5 +37,7 @@ export default class S3ObjectStore {
     } while (token);
     return { folders: folders.sort(), objects: objects.sort() };
   }
+  // A short-lived URL the browser PUTs a file to (uploads larger than a Lambda request allows).
+  async uploadUrl(key, { expiresIn = 900, contentType = "application/octet-stream" } = {}) { return await getSignedUrl(this.client, new PutObjectCommand({ Bucket: this.bucket, Key: key, ContentType: contentType }), { expiresIn }); }
   async delete(key) { await this.client.send(new DeleteObjectCommand({ Bucket: this.bucket, Key: key })); }
 }

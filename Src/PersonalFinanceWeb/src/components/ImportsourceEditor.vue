@@ -48,10 +48,17 @@ async function runSample(file = sampleFile.value) {
     if (!props.source && ["csv", "json", "xlsx"].includes(extension)) draft.format = extension;
     if (!props.source && !draft.filenameFilter.pattern) draft.filenameFilter.pattern = file.name.replace(/\d+/g, "*").replace(/\*+/g, "*");
     const translatorsReady = TARGETS.every((target) => target.id === "account" || draft.translators[target.id].parts.length);
-    sample.value = await api.post(`${tenantPath()}/datasources/${props.datasource}/sample`, { filename: file.name, contentBase64: await readBase64(file), format: draft.format, options: draft.options, ...(translatorsReady ? { translators: draft.translators } : {}) });
+    // A sample needs only the start of a big CSV (cut at the last whole line); other formats are read whole.
+    const part = draft.format === "csv" && file.size > 2 * 1024 * 1024 ? await cutCsv(file) : file;
+    sample.value = await api.post(`${tenantPath()}/datasources/${props.datasource}/sample`, { filename: file.name, contentBase64: await readBase64(part), format: draft.format, options: draft.options, ...(translatorsReady ? { translators: draft.translators } : {}) });
     if (!translatorsReady) guess();
   } catch (failure) { error.value = failure.message; }
   busy.value = false;
+}
+
+async function cutCsv(file) {
+  const text = await file.slice(0, 2 * 1024 * 1024).text();
+  return new Blob([text.slice(0, text.lastIndexOf("\n") + 1)]);
 }
 
 // A first guess at the mapping from the column names.

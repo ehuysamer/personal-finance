@@ -60,7 +60,15 @@ async function upload(list, importsource) {
     const entry = { name: file.name, status: "uploading…" };
     uploads.value.unshift(entry);
     try {
-      const result = await api.post(`${D()}/files`, { filename: file.name, contentBase64: await readBase64(file), importsource });
+      // Over 3 MB the file goes straight to the bucket (a Lambda request takes about 6 MB, base64 adds a third).
+      let body = { filename: file.name, importsource };
+      const target = file.size > 3 * 1024 * 1024 ? await api.post(`${D()}/upload-url`, { filename: file.name }) : { url: null };
+      if (target.url) {
+        const put = await fetch(target.url, { method: "PUT", headers: { "Content-Type": target.contentType }, body: file });
+        if (!put.ok) throw new Error(`upload failed (${put.status})`);
+        body.uploadId = target.uploadId;
+      } else body.contentBase64 = await readBase64(file);
+      const result = await api.post(`${D()}/files`, body);
       entry.status = result.status === "already-imported" ? `already imported as ${result.sameAs}` : `${result.status}: ${result.added} added, ${result.alreadyPresent} already there${result.rejectedCount ? `, ${result.rejectedCount} rows rejected` : ""}`;
       entry.ok = true;
     } catch (failure) {

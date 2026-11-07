@@ -1,0 +1,5 @@
+node_modules/
+dist/
+infra/.terraform/
+infra/*.tfplan
+infra/*.zip

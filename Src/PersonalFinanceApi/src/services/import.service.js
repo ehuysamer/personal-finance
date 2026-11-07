@@ -59,10 +59,25 @@ export default function createImportService({ store, indexService, workspaceServ
 
   // Upload a statement: the importsource is chosen by the filename filters unless named. The same filename again
   // replaces that file's rows; the same content under another name is refused as already imported.
-  async function upload(tenant, ds, { filename, contentBase64, importsource }) {
+  // Large files go straight to the bucket: the browser PUTs to a presigned URL under {ds}/$uploads/, then calls
+  // upload with uploadId. Stores without presigning (local, memory) answer url null: send contentBase64 instead.
+  async function uploadUrl(tenant, ds, { filename }) {
     await datasource(tenant, ds);
     const name = cleanFilename(filename);
-    const buffer = Buffer.from(String(contentBase64 || ""), "base64");
+    if (typeof store.uploadUrl !== "function") return { url: null };
+    const uploadId = randomUUID();
+    return { url: await store.uploadUrl(`${tenant}/${ds}/$uploads/${uploadId}/${name}`), uploadId, contentType: "application/octet-stream", expiresIn: 900 };
+  }
+
+  async function upload(tenant, ds, { filename, contentBase64, uploadId, importsource }) {
+    await datasource(tenant, ds);
+    const name = cleanFilename(filename);
+    let buffer;
+    const uploadKey = uploadId ? `${tenant}/${ds}/$uploads/${assertId(String(uploadId), "uploadId")}/${name}` : null;
+    if (uploadKey) {
+      try { buffer = (await store.get(uploadKey)).body; } catch (error) { if (error.statusCode === 404) throw new HttpError(400, "ERR-UPLOAD", "the uploaded file was not found; upload it again"); throw error; }
+      await store.delete(uploadKey);
+    } else buffer = Buffer.from(String(contentBase64 || ""), "base64");
     if (!buffer.length) throw new HttpError(400, "ERR-UPLOAD", "contentBase64 is required");
     if (buffer.length > config.maxUploadBytes) throw new HttpError(413, "ERR-TOO-LARGE", `files are at most ${Math.round(config.maxUploadBytes / 1048576)} MB`);
     let sourceId = importsource;
@@ -185,6 +200,6 @@ export default function createImportService({ store, indexService, workspaceServ
       match: matchImportsource,
       rebuild: (tenant, ds) => importsources.rebuild(folder(tenant, ds))
     },
-    files, sample, upload, deleteFile, manualTransactions, totals, datasourceTransactions, bankAccounts
+    files, sample, upload, uploadUrl, deleteFile, manualTransactions, totals, datasourceTransactions, bankAccounts
   };
 }

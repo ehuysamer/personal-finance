@@ -22,6 +22,16 @@ timeseries and forecasts them. The spec is `doc/requirements.md` (markers `[ ]` 
   `dev.tfvars`/`prod.tfvars`; deploy scripts plan by default and apply with `--apply`.
 - `ai/` holds instructions, `session.md` (keep it current so a later session can resume) and `todo.todo`.
 
+## Commands
+
+- API (`Src/PersonalFinanceApi`): `npm run dev` (port 4200 on `data/`, sign-in bypassed), `npm test`, `npm run lint`,
+  `npm run build`; offline: `npm run import -- <tenant> <datasource> [files]`, `npm run analyse -- <tenant> [project]`,
+  `npm run forecast -- <tenant> [project] <forecast>`, `npm run sync:pull|sync:push -- dev <tenant>`.
+- Web (`Src/PersonalFinanceWeb`): `npm run dev` (port 5190 against the local API), `npm test`, `npm run build`,
+  `NODE_PATH=$(npm root -g) npm run test:e2e`.
+- Deploy (plan by default, `--apply` to apply; API first): `Src/PersonalFinanceApi/scripts/deploy.sh dev`, then
+  `Src/PersonalFinanceWeb/scripts/deploy.sh dev`. Tags `personalfinance-{api,web}-{env}`.
+
 ## Data
 
 - `data/` is the local object store (same layout as the bucket `personalfinance-{env}-20261108`); `data/import/`

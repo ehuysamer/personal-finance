@@ -1,7 +1,7 @@
 # Personal finance: requirements
 
 A multi-tenant personal (or company) finance tool: import bank statements, put transactions into accounts, analyse
-them as timeseries and forecast them. Started 2026-11-08; requirements agreed 2026-11-08.
+them as timeseries and forecast them. Started 2026-11-08; requirements agreed 2026-11-08; API, web, offline mode and Terraform coded the same day (not deployed yet).
 
 Markers: `[ ]` to do, `[C]` coded, `[X]` done (deployed and checked), `[?]` to decide.
 
@@ -18,7 +18,7 @@ Markers: `[ ]` to do, `[C]` coded, `[X]` done (deployed and checked), `[?]` to d
 - `doc/requirements.md` (this document), `ai/` (instructions, session, todo, style), `Scripts/` (deploy, tag).
 - `data/` is the local object store (same layout as the S3 bucket); `data/import/` is a drop folder:
   `npm run import -- <tenant> <datasource>` imports its files into that datasource as if uploaded in the web.
-- [ ] Nothing under `data/` is committed: `data/.gitignore` ignores everything (`*`) apart from itself, so the folders
+- [C] Nothing under `data/` is committed: `data/.gitignore` ignores everything (`*`) apart from itself, so the folders
       exist in a fresh clone but no financial data ever reaches source control. Samples for tests live in
       `Src/PersonalFinanceApi/test/fixtures/` with made-up data only.
 - Code layout as Timeseries: `src/index.js` (local entry and Lambda handler, `buildDependencies()`),
@@ -30,21 +30,21 @@ Markers: `[ ]` to do, `[C]` coded, `[X]` done (deployed and checked), `[?]` to d
 
 ## Sign-in and access
 
-- [ ] Sign-in with the shared admin pool (`knowledgebase-admin-shared`, the same as Timeseries), own app client.
+- [C] Sign-in with the shared admin pool (`knowledgebase-admin-shared`, the same as Timeseries), own app client.
       The web uses the Cognito hosted UI (code + PKCE) and calls the API with the user's token; the API verifies it.
-- [ ] Only `ehuysamer@gmail.com` has access for now: an allow-list of emails in the API's config (`dev.tfvars`);
+- [C] Only `ehuysamer@gmail.com` has access for now: an allow-list of emails in the API's config (`dev.tfvars`);
       everyone else gets 403 even with a valid pool login.
-- [ ] MCP: OAuth that signs in through the same Cognito client, so MCP calls act as the user (same allow-list and
+- [C] MCP: OAuth that signs in through the same Cognito client, so MCP calls act as the user (same allow-list and
       tenant checks). REST also accepts a per-tenant API key (in `Doc/secrets.local.txt`, never in files) for scripts.
 
 ## Tenants
 
-- [ ] All data are kept per tenant; every request names a tenant and is checked against the user's memberships.
-- [ ] After sign-in the user sees the list of tenants they belong to and picks one (remembered on the device);
+- [C] All data are kept per tenant; every request names a tenant and is checked against the user's memberships.
+- [C] After sign-in the user sees the list of tenants they belong to and picks one (remembered on the device);
       a switcher in the header changes it. With one tenant it is opened directly.
-- [ ] Tenant: `id`, `name`, `members` (email, role `owner` | `member`), `createdAt`. Owners add/remove members and
+- [C] Tenant: `id`, `name`, `members` (email, role `owner` | `member`), `createdAt`. Owners add/remove members and
       rename the tenant. A first tenant is seeded for the owner.
-- [ ] Later Subscription integration (not now): tenants and memberships come from one module,
+- [C] Later Subscription integration (not now): tenants and memberships come from one module,
       `services/tenantDirectory.service.js` (today: S3 tenant files and the allow-list). Swapping it for the
       Subscription system (its pool, `appId`, entitlements, as Risk log does) must not touch the rest of the code.
 
@@ -67,120 +67,123 @@ $tenants/{tenant}.json                      tenant and members
 {tenant}/{project}/accounts/$index.json, {account}.json
 {tenant}/{project}/rules/$index.json, {rule}.json
 {tenant}/{project}/charts/$index.json, {chart}.json
-{tenant}/{project}/analysis/$meta.json      last run: status, started/finished, counts, warnings
+{tenant}/{project}/analysis/$results.json   last run: status, started/finished, counts, last date, warnings
 {tenant}/{project}/analysis/accounts/{account}/transactions/{yyyy}.json
 {tenant}/{project}/analysis/accounts/{account}/aggregates.json
 {tenant}/{project}/forecasts/$index.json
 {tenant}/{project}/forecasts/{forecast}/$meta.json        definition (formulas, parameters, generators)
+{tenant}/{project}/forecasts/{forecast}/$results.json, model.json   last run, model terms per account
 {tenant}/{project}/forecasts/{forecast}/accounts/{account}/...   as analysis
-{tenant}/{project}/jobs/{jobId}.json        long-running job state
+{tenant}/{project}/jobs/$index.json, {jobId}.json   long-running jobs (last 50) and their state
+{tenant}/{datasource}/$uploads/{uploadId}/{filename}    large uploads, removed once imported
+{tenant}/$users/{sha256(email)}.json         a user's preferences (active project)
 ```
 
-- [ ] Indexes (`$index.json`) are lists of things (tenants, projects, datasources, importsources, files, accounts,
+- [C] Indexes (`$index.json`) are lists of things (tenants, projects, datasources, importsources, files, accounts,
       rules, charts, forecasts) so the API never needs S3 list calls to show them. Every create, rename, clone, move
       and delete keeps them in step (conditional writes, so two writes can't lose each other's change);
       `POST /v1/tenants/{tenant}/indexes/rebuild` repairs them from the folders. Deletes are soft (renamed
       `.<timestamp>.deleted`) and drop out of the index.
-- [ ] `$meta.json` is written last and is the completion signal (as Timeseries).
+- [C] `$meta.json` is written last and is the completion signal (as Timeseries).
 
 ## 1. Import
 
 ### Datasources
 
-- [ ] A datasource is a named, normalised place where data to import lives (e.g. "ASB everyday", "Kiwisaver").
+- [C] A datasource is a named, normalised place where data to import lives (e.g. "ASB everyday", "Kiwisaver").
       Add / edit / delete; fields `id`, `name`, `description`, `currency` (default NZD).
-- [ ] Files are uploaded in the web (several at once, also from the phone) or from `data/import/`. Each upload picks
+- [C] Files are uploaded in the web (several at once, also from the phone) or from `data/import/`. Each upload picks
       its importsource by the filename filters (below); when none or several match, the user chooses.
 
 ### Importsources
 
-- [ ] A datasource has one or more importsources. Each has `name`, `format` (`csv` | `json` | `xlsx`; more later),
+- [C] A datasource has one or more importsources. Each has `name`, `format` (`csv` | `json` | `xlsx`; more later),
       format options (csv delimiter, encoding, header rows to skip; json rows path; xlsx sheet), a **filename filter**
       (wildcard or regex, e.g. `ASB-*-Export.csv`), and its **translators**.
-- [ ] **Import sample**: upload a sample file; the web shows its columns and first rows, and the user maps them.
-- [ ] Target fields: `date`, `account`, `description`, `amount`. Each target has an ordered list of parts:
+- [C] **Import sample**: upload a sample file; the web shows its columns and first rows, and the user maps them.
+- [C] Target fields: `date`, `account`, `description`, `amount`. Each target has an ordered list of parts:
       a source column, or a fixed (hardcoded) value. Several parts are joined (text: with a separator, default
       space; amount: added, so debit and credit columns can make one amount, each with an optional sign flip).
       The order can be changed. Date parts take a format (`dd/MM/yyyy`, Excel serial, ...).
-- [ ] The mapping preview shows the normalised rows for the sample before saving.
-- [ ] Clone an importsource (then configure it), or clone it into another datasource (move = clone then delete).
+- [C] The mapping preview shows the normalised rows for the sample before saving.
+- [C] Clone an importsource (then configure it), or clone it into another datasource (move = clone then delete).
 
 ### Duplicates
 
-- [ ] Each normalised row keeps its datasource, file id and **filename**, and its row number.
-- [ ] Natural key: datasource + date + account + description + amount. Within one file, identical rows are all real
+- [C] Each normalised row keeps its datasource, file id and **filename**, and its row number.
+- [C] Natural key: datasource + date + account + description + amount. Within one file, identical rows are all real
       (occurrences 1..n). Across files, the same natural key is the same transaction (statements overlap), so the
       datasource keeps, per natural key, as many rows as the **largest count in any single file**. Each kept row
       records which file it came from.
-- [ ] Uploading a file with the same filename (or the same SHA-256) again replaces that file's rows; it never adds
+- [C] Uploading a file with the same filename (or the same SHA-256) again replaces that file's rows; it never adds
       duplicates. The upload result reports added / already present / replaced.
 
 ### Manual transactions and totals
 
-- [ ] The user can add, edit and delete transactions by hand (same fields; marked `manual`).
-- [ ] The user can add a **total**: the balance of a bank account (the imported `account` field) on a date, e.g. a
+- [C] The user can add, edit and delete transactions by hand (same fields; marked `manual`).
+- [C] The user can add a **total**: the balance of a bank account (the imported `account` field) on a date, e.g. a
       statement's closing balance. A total is the **source of truth**: when analysis runs and the transactions up to
       that date don't add up to it, analysis creates an adjustment transaction (`Balance adjustment`, marked
       `generated`) for the difference, and creates it afresh every run (so regenerating never loses it).
-- [ ] Each datasource shows its bank accounts with their running balance and totals.
+- [C] Each datasource shows its bank accounts with their running balance and totals.
 
 ## 2. Projects and accounts
 
-- [ ] Projects: add / edit / clone / delete. One project is always active (the user's choice, remembered per tenant);
+- [C] Projects: add / edit / clone / delete. One project is always active (the user's choice, remembered per tenant);
       from section 2 onwards every screen works in the active project, shown in the header. A tenant with no
       project is asked to create one before going further.
-- [ ] A project names one or more datasources (of its tenant).
-- [ ] A project has a **birth date** (a person's age, or a company's founding date) so ages can be shown and
+- [C] A project names one or more datasources (of its tenant).
+- [C] A project has a **birth date** (a person's age, or a company's founding date) so ages can be shown and
       forecasts can run "until age 65".
-- [ ] A project has a list of **categories** (e.g. Income, Housing, Food, Transport), each with a type
+- [C] A project has a list of **categories** (e.g. Income, Housing, Food, Transport), each with a type
       `income` | `expense` | `asset` | `liability` and a default inflation rate for forecasting.
-- [ ] Accounts within a project: add / edit / delete; `name`, optional **short code** (unique in the project,
+- [C] Accounts within a project: add / edit / delete; `name`, optional **short code** (unique in the project,
       letters, digits and `_`, used in charts and formulas), one **category**, **tags**, `description`.
       Deleting an account in use by rules or charts warns and lists them.
-- [ ] A built-in `Uncategorised` account catches transactions no rule matches.
+- [C] A built-in `Uncategorised` account catches transactions no rule matches.
 
 ## 3. Analysis
 
 ### Rules
 
-- [ ] Rules have a name, an order (first match wins; drag to reorder), a target account, enabled flag and conditions
+- [C] Rules have a name, an order (first match wins; drag to reorder), a target account, enabled flag and conditions
       (all must match).
-- [ ] Text conditions on any field (`description`, `account`, `filename`, `datasource`): `wildcard` (`*` any run,
+- [C] Text conditions on any field (`description`, `account`, `filename`, `datasource`): `wildcard` (`*` any run,
       `?` one character), `regex` (bounded input length and time), `exact`, `startswith`, `endswith`,
       `containsall` and `containsany` (several entries), `not` flag, case-insensitive by default.
-- [ ] Date range (optional start, optional end) and amount range (optional minimum, optional maximum).
-- [ ] "Test rule" shows which transactions it would match (and which earlier rule takes them instead).
+- [C] Date range (optional start, optional end) and amount range (optional minimum, optional maximum).
+- [C] "Test rule" shows which transactions it would match (and which earlier rule takes them instead).
 
 ### Running analysis
 
-- [ ] **Analyse** reads the project's datasources (imported and manual rows, totals), applies the rules, and writes
+- [C] **Analyse** reads the project's datasources (imported and manual rows, totals), applies the rules, and writes
       each account's transactions and aggregates. It rebuilds from scratch each time, so it is repeatable.
-- [ ] Each account gets per-transaction running totals, and **monthly, quarterly and yearly** aggregates: sum,
+- [C] Each account gets per-transaction running totals, and **monthly, quarterly and yearly** aggregates: sum,
       running total, count, average, minimum, maximum. Category totals are aggregated the same way. These are
       built in the same pass as the transactions.
-- [ ] The results are timeseries: readable by the chart engine, and downloadable as CSV.
+- [C] The results are timeseries: readable by the chart engine, and downloadable as CSV.
       [?] Publish them to the Timeseries system as a Gold set later.
 
 ### Charts
 
-- [ ] Named charts saved per project. Series: an account (by short code), a category total, or a tag total; a measure
+- [C] Named charts saved per project. Series: an account (by short code), a category total, or a tag total; a measure
       (running total, sum, count, average, min, max); a bucket (month, quarter, year).
-- [ ] Calculated series with the Timeseries expression language (`chartExpression.js`: series names, numbers,
+- [C] Calculated series with the Timeseries expression language (`chartExpression.js`: series names, numbers,
       `+ - * /`, parentheses, per-bucket aggregates), e.g. `INC - EXP`, `SAV / INC * 100`.
-- [ ] Charts are calculated by the API, never in the browser (as Timeseries).
+- [C] Charts are calculated by the API, never in the browser (as Timeseries).
 
 ### Account history
 
-- [ ] Each account's transactions, paged, newest first by default (sort by date or amount, either way), with date
+- [C] Each account's transactions, paged, newest first by default (sort by date or amount, either way), with date
       range and text filters, the running total, and the source (file and row, manual, or generated).
 
 ## 4. Forecast
 
-- [ ] A forecast has a name, belongs to a project, and everything about it lives under that name. It runs after
+- [C] A forecast has a name, belongs to a project, and everything about it lives under that name. It runs after
       analysis and reads the analysis results. Clone, rename, delete.
-- [ ] **Frequency** `{n}{unit}`: `d` day, `w` week, `m` month, `q` quarter, `y` year (`1d`, `1w`, `6m`).
-- [ ] **Horizon**: a number of days or years (`90d`, `10y`), until a date, or until an age (from the birth date).
-- [ ] Charts and history as in analysis. **Include actuals** option: actuals are solid lines and normal rows;
+- [C] **Frequency** `{n}{unit}`: `d` day, `w` week, `m` month, `q` quarter, `y` year (`1d`, `1w`, `6m`).
+- [C] **Horizon**: a number of days or years (`90d`, `10y`), until a date, or until an age (from the birth date).
+- [C] Charts and history as in analysis. **Include actuals** option: actuals are solid lines and normal rows;
       forecast values are dotted lines and greyed rows (or the reverse; one look applied everywhere).
 
 ### Forecast model (per account, editable)
@@ -201,55 +204,80 @@ Forecast value at time `t` (years from now), for period month `m`:
 value(t) = replay(t) + base_real × (1 + g)^t × s(m) × (1 + i_category)^t  [+ noise within the min/max band]
 ```
 
-- [ ] Method per account: `replay+trend` (default), `trend`, `average`, `last`, `fixed`, `none`.
-- [ ] Parameters the user can change per forecast: inflation rate per category (and per account override), growth
+- [C] Method per account: `replay+trend` (default), `trend`, `average`, `last`, `fixed`, `none`.
+- [C] Parameters the user can change per forecast: inflation rate per category (and per account override), growth
       override, lookback, seasonality on/off, replay on/off, noise on/off with a seed (time, number or codeword, as
       Timeseries), caps.
-- [ ] Formulas the user can edit: per account, an expression in the chart expression language over the model terms
-      (`base`, `g`, `s`, `i`, `t`, `age`, other accounts' short codes), e.g. `EXP * 1.02` or `0` from age 65.
-- [ ] **Generators** add to or take from an account's values: `random` (min, max, seed), `sine` (amplitude, period,
+- [C] Formulas the user can edit: per account, an expression in the chart expression language over the model terms
+      giving the period's total; names: `value` (the model's value), `replay` (replayed transactions), `base`, `g`,
+      `s`, `i`, `t` (years ahead), `age`, and other accounts' short codes (their model values), e.g.
+      `replay + value * 1.05`. Each account also has an optional start and end (a date or `{ age }`), outside which
+      it is 0 (e.g. salary ends at age 65).
+- [C] **Generators** add to or take from an account's values: `random` (min, max, seed), `sine` (amplitude, period,
       phase, offset), `minimum` / `maximum` (a floor or cap on the account's value), `linear` (from a value to a
       value, or a slope per year), each with an optional start and end (date or age) and its own frequency.
-- [ ] Each forecast run writes `$meta.json` with the model terms found per account, so the user can see why.
+- [C] Each forecast run writes `model.json` with the model terms found per account (shown on the Model tab), so the
+      user can see why.
 
 ## Long-running jobs
 
-- [ ] Analysis and forecast runs (and big imports) are **jobs**: `POST` returns a job id at once; the web shows
+- [C] Analysis and forecast runs (and big imports) are **jobs**: `POST` returns a job id at once; the web shows
       progress and can cancel.
-- [ ] A worker Lambda works in chunks and checkpoints to `jobs/{jobId}.json`; when less than 60 s of its time is
+- [C] A worker Lambda works in chunks and checkpoints to `jobs/{jobId}.json`; when less than 60 s of its time is
       left it saves and re-invokes itself (async) to carry on. Lambda timeout 5 minutes.
-- [ ] Limits (in config): at most 30 minutes and 20 invocations per job; one running job per project (DynamoDB
+- [C] Limits (in config): at most 30 minutes and 20 invocations per job; one running job per project (DynamoDB
       lease); file uploads up to 10 MB and 200 000 rows; forecasts up to 100 years and 2 million points. A job past a
       limit stops with `ERR-JOB-LIMIT` and keeps what it had written as incomplete.
 
 ## Offline (local) mode
 
-- [ ] Everything runs on one machine without AWS: the API uses `data/` as its object store (the file store, as
+- [C] Everything runs on one machine without AWS: the API uses `data/` as its object store (the file store, as
       Timeseries' `fileObjectStore`), memory leases instead of DynamoDB, and runs jobs in-process with the same chunking
       and limits (no Lambda re-invoke).
-- [ ] `npm run dev` starts the local API (sign-in bypassed as a local owner user, bound to localhost only) and the web
+- [C] `npm run dev` starts the local API (sign-in bypassed as a local owner user, bound to localhost only) and the web
       against it, so import, analysis, charts and forecasts all work offline.
-- [ ] Command line, no server needed: `npm run analyse -- <tenant> <project>`, `npm run forecast -- <tenant> <project>
+- [C] Command line, no server needed: `npm run analyse -- <tenant> <project>`, `npm run forecast -- <tenant> <project>
       <forecast>`, `npm run import -- <tenant> <datasource> [files]`; they print progress and the job summary.
-- [ ] Sync between the bucket and `data/`: `npm run sync:pull -- dev <tenant>` copies a tenant down;
+- [C] Sync between the bucket and `data/`: `npm run sync:pull -- dev <tenant>` copies a tenant down;
       `npm run sync:push -- dev <tenant>` copies local changes up (newer files only; asks before overwriting files that
       changed on both sides; never deletes remotely unless `--delete`). The indexes are rebuilt after a sync.
-- [ ] The same analysis and forecast code runs in Lambda and locally (one `services/` implementation; only the store,
+      *Not yet run against the bucket (it does not exist until the first deploy).*
+- [C] The same analysis and forecast code runs in Lambda and locally (one `services/` implementation; only the store,
       lease and job runner differ), so local results match the cloud's.
 
 ## Web (mobile-first)
 
-- [ ] Designed for a phone first: bottom navigation Import / Accounts / Analysis / Forecast, header with tenant and
+- [C] Designed for a phone first: bottom navigation Import / Accounts / Analysis / Forecast, header with tenant and
       active project switcher, cards and lists rather than wide tables, mappings edited one target field at a time.
       Wider layouts on tablet and desktop.
 
 ## API and MCP
 
-- [ ] REST under `/v1/tenants/{tenant}/...` for every entity and action; `GET /v1/me` (user and tenants);
-      `GET /v1/status`; OpenAPI in `doc/openapi.yaml`; Bruno collection.
-- [ ] MCP at `/v1/mcp` with a tool for everything REST does (tenants, datasources, importsources, uploads,
+- [C] REST under `/v1/tenants/{tenant}/...` for every entity and action; `GET /v1/me` (user and tenants);
+      `GET /v1/status`. Every operation is defined once in `src/handlers/operations.handler.js`, which makes both
+      its REST route and its MCP tool.
+- [ ] OpenAPI in `doc/openapi.yaml`; Bruno collection.
+- [C] MCP at `/v1/mcp` with a tool for everything REST does (tenants, datasources, importsources, uploads,
       transactions, totals, projects, accounts, rules, analysis, charts, history, forecasts, jobs).
+
+## Decided while building (2026-11-08)
+
+- Uploads over 3 MB go straight to the bucket with a presigned URL (`POST .../upload-url`, then `POST .../files`
+  with `uploadId`): a Lambda request takes about 6 MB and base64 adds a third. Smaller files are sent as base64;
+  offline there is no presigning, so base64 is used for all sizes. The import sample of a CSV over 2 MB reads its
+  first 2 MB.
+- Balance adjustments go through the rules like any transaction (description `Balance adjustment`), so a rule can
+  send them to an account; otherwise they land in Uncategorised.
+- MCP sign-in: the client registers itself (stateless: its client id is a signed list of its redirect URIs), then
+  signs in at the Cognito hosted login through the API's own app client; tokens are signed by the API (1 hour, 30-day
+  refresh). Codes are signed, not stored, so a code can be reused within its 5 minutes; acceptable while the system
+  has one user, to be replaced by stored single-use codes before others get access.
+- The web keeps its sign-in on the device (localStorage), so a phone stays signed in for the refresh token's 30 days.
+- One Lambda serves the API and the job worker (an event `{ job }` is a worker slice); API Gateway throttles at 20
+  requests a second (burst 50). Lambda does not retry a failed slice; the job records the failure.
+- Charts are drawn by the web's own SVG chart (no chart library): actuals solid, forecasts dotted.
 
 ## To decide
 
 - See the `[?]` items above.
+- Monitor checks for the API (`/v1/status`) and the web, like the other apps.
