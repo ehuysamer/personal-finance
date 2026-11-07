@@ -1,0 +1,17 @@
+node_modules/
+build/
+dist/
+coverage/
+.env
+.env.*
+!.env.example
+*.zip
+*.tfstate
+*.tfstate.*
+.terraform/
+*.tfplan
+Doc/secrets.local.txt
+doc/secrets.local.txt
+.local-processes/
+test-results/
+playwright-report/

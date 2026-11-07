@@ -1,0 +1,5 @@
+# Nothing under data/ is committed: only these .gitignore files.
+*
+!.gitignore
+!import/
+!import/.gitignore
