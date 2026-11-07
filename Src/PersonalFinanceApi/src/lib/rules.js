@@ -12,10 +12,11 @@ function optionalNumber(value, what) {
   return number;
 }
 
-export function validateRule(rule) {
+// requireAccount is off only for testing a rule that has no account chosen yet.
+export function validateRule(rule, { requireAccount = true } = {}) {
   const name = String(rule.name || "").trim();
   if (!name) throw new HttpError(400, "ERR-NAME", "name is required");
-  if (!rule.account) throw new HttpError(400, "ERR-RULE", "account is required");
+  if (requireAccount && !rule.account) throw new HttpError(400, "ERR-RULE", "account is required");
   const conditions = (Array.isArray(rule.conditions) ? rule.conditions : []).map((condition, i) => {
     if (!RULE_FIELDS.includes(condition.field)) throw new HttpError(400, "ERR-RULE", `condition ${i + 1}: field must be one of ${RULE_FIELDS.join(", ")}`);
     const clean = { field: condition.field, op: condition.op };

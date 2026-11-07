@@ -180,6 +180,8 @@ $tenants/{tenant}.json                      tenant and members
       `containsall` and `containsany` (several entries), `not` flag, case-insensitive by default.
 - [C] Date range (optional start, optional end) and amount range (optional minimum, optional maximum).
 - [C] "Test rule" shows which transactions it would match (and which earlier rule takes them instead).
+- [C] A new rule's account is never pre-filled ("Choose an account"): the user picks it explicitly before saving. A
+      rule can be tested before its account is chosen.
 - [C] After analysis, **Not matched by any rule** lists the transactions that went to Uncategorised (paged, newest
       first, searchable), each with **Add rule**: the rule sheet opens pre-filled with a name and a "description
       contains" condition taken from the beneficiary words of its description (a run of up to four words without

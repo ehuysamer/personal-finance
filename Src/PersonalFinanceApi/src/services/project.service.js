@@ -98,7 +98,7 @@ export default function createProjectService({ store, indexService, workspaceSer
       },
       // Test a rule (saved or not) against transactions: which it matches, and which an earlier rule takes.
       async test(transactions, allRules, candidate, limit = 50) {
-        const rule = validateRule(candidate);
+        const rule = validateRule(candidate, { requireAccount: false });
         const matches = compileRule(rule);
         const earlier = createCategoriser(allRules.filter((item) => item.id !== rule.id && item.order < rule.order));
         const matched = [];

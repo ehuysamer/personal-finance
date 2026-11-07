@@ -57,7 +57,7 @@ const rulesChanged = ref(false);
 function ruleFromTransaction(tx) {
   const suggestion = tx.suggestedRule;
   addingAccount.value = false;
-  ruleDraft.value = { name: suggestion.name, account: accounts.value.find((account) => !account.builtIn)?.id, enabled: true, conditions: suggestion.conditions.map((condition) => ({ ...condition })), date: { start: "", end: "" }, amount: { min: "", max: "" }, example: suggestion.example };
+  ruleDraft.value = { name: suggestion.name, account: "", enabled: true, conditions: suggestion.conditions.map((condition) => ({ ...condition })), date: { start: "", end: "" }, amount: { min: "", max: "" }, example: suggestion.example };
   testResult.value = null;
   testRule();
 }
@@ -65,7 +65,7 @@ function ruleFromTransaction(tx) {
 const accountName = (id) => accounts.value.find((account) => account.id === id)?.name || id;
 const accountSummary = computed(() => (status.value?.accounts || []).map((item) => ({ ...item, name: accountName(item.id) })).sort((a, b) => Math.abs(b.running) - Math.abs(a.running)));
 
-function newRule() { addingAccount.value = false; ruleDraft.value = { name: "", account: accounts.value.find((account) => !account.builtIn)?.id, enabled: true, conditions: [{ field: "description", op: "contains", value: "" }], date: { start: "", end: "" }, amount: { min: "", max: "" } }; testResult.value = null; }
+function newRule() { addingAccount.value = false; ruleDraft.value = { name: "", account: "", enabled: true, conditions: [{ field: "description", op: "contains", value: "" }], date: { start: "", end: "" }, amount: { min: "", max: "" } }; testResult.value = null; }
 async function editRule(item) { addingAccount.value = false; const rule = await api.get(`${projectPath()}/rules/${item.id}`); ruleDraft.value = { ...rule, date: { start: rule.date.start || "", end: rule.date.end || "" }, amount: { min: rule.amount.min ?? "", max: rule.amount.max ?? "" }, conditions: rule.conditions.map((condition) => ({ ...condition, value: condition.values ? condition.values.join(", ") : condition.value })) }; testResult.value = null; }
 function body() {
   const draft = ruleDraft.value;
@@ -147,7 +147,7 @@ async function moveRule(index, delta) {
         <div class="field">
           <span class="small muted" style="font-weight: 550">Into account</span>
           <div class="row" style="flex-wrap: nowrap">
-            <select v-model="ruleDraft.account" aria-label="Into account"><option v-for="account in accounts" :key="account.id" :value="account.id">{{ account.name }}</option></select>
+            <select v-model="ruleDraft.account" aria-label="Into account"><option value="" disabled>Choose an account</option><option v-for="account in accounts" :key="account.id" :value="account.id">{{ account.name }}</option></select>
             <button class="icon" aria-label="Add an account" title="Add an account" @click="addingAccount = true"><Icon name="plus" /></button>
           </div>
         </div>

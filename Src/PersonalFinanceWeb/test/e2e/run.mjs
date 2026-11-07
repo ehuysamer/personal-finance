@@ -131,6 +131,8 @@ try {
   if (await sheet.getByPlaceholder("Supermarkets").inputValue() !== "Rent") throw new Error("the rule name was not pre-filled");
   if (await sheet.getByLabel("Value", { exact: true }).inputValue() !== "Rent") throw new Error("the condition was not pre-filled");
   await sheet.getByText("3 transactions match").waitFor();
+  if (await sheet.getByLabel("Into account").inputValue() !== "") throw new Error("the account was pre-filled");
+  if (!(await sheet.getByRole("button", { name: "Save" }).isDisabled())) throw new Error("Save is enabled without an account");
   // A tap outside the form does not close it.
   await page.mouse.click(5, 70);
   await sheet.waitFor();

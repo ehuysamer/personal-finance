@@ -61,6 +61,9 @@ test("import, analyse, chart and forecast end to end", async (t) => {
   await api.call("POST", `${P}/rules`, { name: "Rent", account: rent.body.id, conditions: [{ field: "description", op: "wildcard", value: "rent*" }], amount: { max: 0 } });
   const tested = await api.call("POST", `${P}/rules-test`, { rule: { name: "coffee", account: food.body.id, conditions: [{ field: "description", op: "regex", value: "^coffee" }] } });
   assert.equal(tested.body.count, 2);
+  const noAccount = await api.call("POST", `${P}/rules-test`, { rule: { name: "coffee", conditions: [{ field: "description", op: "regex", value: "^coffee" }] } });
+  assert.equal(noAccount.body.count, 2, "a rule can be tested before its account is chosen");
+  assert.equal((await api.call("POST", `${P}/rules`, { name: "coffee", conditions: [{ field: "description", op: "exact", value: "x" }] })).status, 400, "but not saved");
 
   const job = await api.call("POST", `${P}/analysis`);
   assert.equal(job.status, 202, JSON.stringify(job.body));
