@@ -131,6 +131,9 @@ try {
   if (await sheet.getByPlaceholder("Supermarkets").inputValue() !== "Rent") throw new Error("the rule name was not pre-filled");
   if (await sheet.getByLabel("Value", { exact: true }).inputValue() !== "Rent") throw new Error("the condition was not pre-filled");
   await sheet.getByText("3 transactions match").waitFor();
+  // A tap outside the form does not close it.
+  await page.mouse.click(5, 70);
+  await sheet.waitFor();
   // A new account (in a new category) for it, made from the rule form.
   await sheet.getByRole("button", { name: "Add an account" }).click();
   await sheet.getByLabel("New account name").fill("Rent payments");

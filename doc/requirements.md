@@ -296,6 +296,7 @@ value(t) = replay(t) + base_real × (1 + g)^t × s(m) × (1 + i_category)^t  [+ 
 
 ## Web (mobile-first)
 
+- [C] Pop-ups (forms such as the rule editor) close only with their ✕ or when saved, never by a tap outside them.
 - [C] Designed for a phone first: bottom navigation Import / Accounts / Analysis / Forecast, header with tenant and
       active project switcher, cards and lists rather than wide tables, mappings edited one target field at a time.
       Wider layouts on tablet and desktop.
