@@ -149,7 +149,7 @@ async function moveRule(index, delta) {
           <div v-for="branch in group.accounts" :key="branch.account.id" class="rule-account">
             <h4>{{ branch.account.name }} <span class="muted small">{{ branch.rules.length }} {{ branch.rules.length === 1 ? "rule" : "rules" }}</span></h4>
             <ul class="list">
-              <li v-for="rule in branch.rules" :key="rule.id" class="link rule-row" role="button" tabindex="0" :aria-label="`Edit rule ${rule.name}`" @click="editRule(rule)" @keyup.enter="editRule(rule)">
+              <li v-for="rule in branch.rules" :key="rule.id" class="link rule-row" :class="{ disabled: !rule.enabled }" role="button" tabindex="0" :aria-label="`Edit rule ${rule.name}`" @click="editRule(rule)" @keyup.enter="editRule(rule)">
                 <span class="badge" :title="`Rule ${rule.place} of ${rules.length}`">{{ rule.place }}</span>
                 <div class="grow"><div class="title">{{ rule.name }} <span v-if="!rule.enabled" class="badge">off</span></div></div>
                 <button class="icon ghost" aria-label="Clone" title="Clone" @click.stop="cloneRule(rule)"><Icon name="copy" /></button>
@@ -162,7 +162,7 @@ async function moveRule(index, delta) {
       </template>
       <!-- The order rules are tried in: move one up or down to change which wins. -->
       <ul v-else class="list">
-        <li v-for="(rule, index) in rules" :key="rule.id" class="link rule-row" role="button" tabindex="0" :aria-label="`Edit rule ${rule.name}`" @click="editRule(rule)" @keyup.enter="editRule(rule)">
+        <li v-for="(rule, index) in rules" :key="rule.id" class="link rule-row" :class="{ disabled: !rule.enabled }" role="button" tabindex="0" :aria-label="`Edit rule ${rule.name}`" @click="editRule(rule)" @keyup.enter="editRule(rule)">
           <span class="badge">{{ index + 1 }}</span>
           <div class="grow"><div class="title">{{ rule.name }} <span v-if="!rule.enabled" class="badge">off</span></div><div class="sub">→ {{ accountName(rule.account) }} <span class="muted">({{ categoryOf(rule.account) }})</span></div></div>
           <button class="icon ghost" :disabled="index === 0" aria-label="Move up" @click.stop="moveRule(index, -1)"><Icon name="up" /></button>

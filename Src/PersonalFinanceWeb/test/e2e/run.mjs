@@ -124,8 +124,16 @@ try {
   }
   // Rules are grouped by category and account; a row opens its rule; In order shows the order they are tried in.
   await page.locator(".rule-category", { hasText: "Food" }).locator(".rule-account", { hasText: "Groceries" }).getByText("Supermarkets").waitFor();
+  // Switched off, a rule is greyed in the list; switched on again, it is not.
   await page.getByRole("button", { name: "Edit rule Supermarkets" }).click();
-  await page.getByRole("dialog", { name: "Edit rule" }).getByLabel("Close").click();
+  await page.getByRole("dialog", { name: "Edit rule" }).getByLabel("Enabled").uncheck();
+  await page.getByRole("dialog", { name: "Edit rule" }).getByRole("button", { name: "Save" }).click();
+  await page.locator("li.rule-row.disabled", { hasText: "Supermarkets" }).waitFor();
+  await shot("3a-rule-off");
+  await page.getByRole("button", { name: "Edit rule Supermarkets" }).click();
+  await page.getByRole("dialog", { name: "Edit rule" }).getByLabel("Enabled").check();
+  await page.getByRole("dialog", { name: "Edit rule" }).getByRole("button", { name: "Save" }).click();
+  await page.locator("li.rule-row:not(.disabled)", { hasText: "Supermarkets" }).waitFor();
   await page.getByRole("tab", { name: "In order" }).click();
   await page.locator("li.rule-row").first().locator(".title", { hasText: "Salary" }).waitFor();
   await page.getByRole("tab", { name: "By account" }).click();

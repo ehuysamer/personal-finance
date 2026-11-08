@@ -1,19 +1,19 @@
 :root {
   --bg: #f6f7f9; --surface: #ffffff; --surface-2: #eef1f4; --text: #17202a; --muted: #5b6673; --border: #d9dee4;
   --accent: #0f766e; --accent-text: #ffffff; --accent-soft: #d7efec; --danger: #b42318; --danger-soft: #fde8e7;
-  --ok: #067647; --warn: #a15c07; --actual: #5b6673; --radius: 8px; --shadow: 0 1px 2px rgb(16 24 40 / 8%);
+  --ok: #067647; --warn: #a15c07; --actual: #5b6673; --off: #e2e6eb; --radius: 8px; --shadow: 0 1px 2px rgb(16 24 40 / 8%);
   --nav-h: 60px; color-scheme: light;
 }
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]) {
     --bg: #0f1419; --surface: #171d24; --surface-2: #202832; --text: #e6e9ed; --muted: #9aa5b1; --border: #2c3540;
-    --accent: #2dd4bf; --accent-text: #052e2b; --accent-soft: #123a37; --danger: #f97066; --danger-soft: #3a1714; --ok: #47cd89; --warn: #fdb022; --actual: #9aa5b1;
+    --accent: #2dd4bf; --accent-text: #052e2b; --accent-soft: #123a37; --danger: #f97066; --danger-soft: #3a1714; --ok: #47cd89; --warn: #fdb022; --actual: #9aa5b1; --off: #2a323d;
     color-scheme: dark;
   }
 }
 :root[data-theme="dark"] {
   --bg: #0f1419; --surface: #171d24; --surface-2: #202832; --text: #e6e9ed; --muted: #9aa5b1; --border: #2c3540;
-  --accent: #2dd4bf; --accent-text: #052e2b; --accent-soft: #123a37; --danger: #f97066; --danger-soft: #3a1714; --ok: #47cd89; --warn: #fdb022; --actual: #9aa5b1;
+  --accent: #2dd4bf; --accent-text: #052e2b; --accent-soft: #123a37; --danger: #f97066; --danger-soft: #3a1714; --ok: #47cd89; --warn: #fdb022; --actual: #9aa5b1; --off: #2a323d;
   color-scheme: dark;
 }
 * { box-sizing: border-box; }
@@ -145,3 +145,6 @@ td .weekday { color: var(--muted); font-size: .75rem; }
 .rule-account { margin: 0 0 10px 12px; }
 .rule-account h4 { margin: 8px 0 4px; font-size: .9rem; }
 .rule-account h4 .muted { font-weight: 400; }
+/* A rule that is switched off: greyed. */
+.list > li.rule-row.disabled, .list > li.rule-row.disabled:hover { background: var(--off); color: var(--muted); }
+.list > li.rule-row.disabled .title { font-weight: 450; }

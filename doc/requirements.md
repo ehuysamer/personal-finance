@@ -178,7 +178,8 @@ $tenants/{tenant}.json                      tenant and members
 - [C] The Rules tab shows them **By account**: category, then account (in the project's order), then the rules that
       move transactions there, each with its place in the order (rules whose account was deleted under "Account
       deleted"). **In order** lists them in the order they are tried, with up and down to change which wins. Rows
-      look clickable (pointer, hover and focus highlight, ›) and open the rule; clone is on each row.
+      look clickable (pointer, hover and focus highlight, ›) and open the rule; clone is on each row. A rule that is switched off
+      has a grey background (and "off").
 - [C] Text conditions on any field (`description`, `account`, `filename`, `datasource`): `wildcard` (`*` any run,
       `?` one character), `regex` (bounded input length and time), `exact`, `startswith`, `endswith`,
       `containsall` and `containsany` (several entries), `not` flag. Each condition has an **Ignore case** tickbox
