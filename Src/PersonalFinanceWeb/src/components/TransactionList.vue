@@ -1,6 +1,7 @@
 <script setup>
 import { inject, ref, watch } from "vue";
-import { formatDate, formatMoney } from "../lib/format.js";
+import { formatMoney } from "../lib/format.js";
+import TxRow from "./TxRow.vue";
 
 // A paged transaction list (newest first by default). path is the API route; params are added to every call.
 // Actual rows are greyed when a forecast is shown with its actuals.
@@ -43,17 +44,11 @@ function source(tx) {
     </div>
     <p v-if="error" class="error">{{ error }}</p>
     <ul class="list">
-      <li v-for="(tx, index) in result.items" :key="`${tx.date}-${index}-${tx.seq ?? ''}`" :class="{ actual: greyActuals && tx.kind === 'actual', stack: !!actionLabel }">
-        <div class="grow">
-          <div class="title">{{ tx.description || "(no description)" }}</div>
-          <div class="sub">{{ formatDate(tx.date) }}<template v-if="tx.seriesLabel"> · {{ tx.seriesLabel }}<template v-if="tx.accountName !== tx.seriesLabel"> ({{ tx.accountName }})</template></template><template v-else-if="tx.bankAccount || tx.account"> · {{ tx.bankAccount || tx.account }}</template> · {{ source(tx) }}<template v-if="greyActuals"> · {{ tx.kind }}</template></div>
-        </div>
-        <div class="num">
-          <div :class="{ neg: tx.amount < 0 }">{{ formatMoney(tx.amount) }}</div>
-          <div v-if="showRunning && tx.running !== undefined" class="sub small">{{ formatMoney(tx.running) }}</div>
-        </div>
-        <div v-if="actionLabel" class="actions"><button class="small" @click="emit('action', tx)">{{ actionLabel }}</button></div>
-      </li>
+      <TxRow v-for="(tx, index) in result.items" :key="`${tx.date}-${index}-${tx.seq ?? ''}`" :tx="tx" :actual="greyActuals && tx.kind === 'actual'">
+        <template #details><template v-if="tx.seriesLabel">{{ tx.seriesLabel }}<template v-if="tx.accountName !== tx.seriesLabel"> ({{ tx.accountName }})</template></template><template v-else-if="tx.bankAccount || tx.account">{{ tx.bankAccount || tx.account }}</template> · {{ source(tx) }}<template v-if="greyActuals"> · {{ tx.kind }}</template></template>
+        <template v-if="showRunning && tx.running !== undefined" #extra>{{ formatMoney(tx.running) }}</template>
+        <template v-if="actionLabel" #actions><button class="small" @click="emit('action', tx)">{{ actionLabel }}</button></template>
+      </TxRow>
       <li v-if="!loading && !result.items.length" class="empty">No transactions</li>
     </ul>
     <div v-if="result.pages > 1" class="spread" style="margin-top: 8px">

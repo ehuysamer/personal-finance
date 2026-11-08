@@ -1,12 +1,13 @@
 <script setup>
 import { computed, inject, onMounted, ref, watch } from "vue";
 import { projectPath, toast } from "../state.js";
-import { formatDate, formatMoney } from "../lib/format.js";
+import { formatMoney } from "../lib/format.js";
 import { colorFor } from "../lib/chart.js";
 import Icon from "./Icon.vue";
 import LineChart from "./LineChart.vue";
 import ChartEditor from "./ChartEditor.vue";
 import TransactionList from "./TransactionList.vue";
+import TxRow from "./TxRow.vue";
 
 // One place for charts, history and aggregates (in Analysis, and in Forecast with forecast set). The settings at the
 // top choose what to look at (a saved chart, or one account), the period (day to year) and dates; then the user
@@ -132,10 +133,9 @@ async function deleted() { editing.value = null; await loadCharts(); choice.valu
             <p v-if="behind[row.period]?.loading" class="muted small">Loading…</p>
             <p v-else-if="behind[row.period]?.error" class="error">{{ behind[row.period].error }}</p>
             <ul v-else class="list">
-              <li v-for="(tx, index) in behind[row.period]?.items || []" :key="index" :class="{ actual: forecast && includeActuals && tx.kind === 'actual' }">
-                <div class="grow"><div class="title">{{ tx.description || "(no description)" }}</div><div class="sub">{{ formatDate(tx.date) }} · {{ tx.seriesLabel }}<template v-if="tx.accountName !== tx.seriesLabel"> ({{ tx.accountName }})</template><template v-if="forecast"> · {{ tx.kind }}</template></div></div>
-                <div class="num" :class="{ neg: tx.amount < 0 }">{{ formatMoney(tx.amount) }}</div>
-              </li>
+              <TxRow v-for="(tx, index) in behind[row.period]?.items || []" :key="index" :tx="tx" :actual="!!forecast && includeActuals && tx.kind === 'actual'">
+                <template #details>{{ tx.seriesLabel }}<template v-if="tx.accountName !== tx.seriesLabel"> ({{ tx.accountName }})</template><template v-if="forecast"> · {{ tx.kind }}</template></template>
+              </TxRow>
               <li v-if="!(behind[row.period]?.items || []).length" class="empty">No transactions (a running total carried over)</li>
               <li v-if="behind[row.period]?.total > (behind[row.period]?.items || []).length" class="empty">{{ behind[row.period].total - behind[row.period].items.length }} more: see History</li>
             </ul>

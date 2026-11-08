@@ -173,7 +173,12 @@ try {
   await shot("5-chart");
   await page.getByRole("tab", { name: "History" }).click();
   await page.getByText("New World").waitFor();
+  // Dates lead each row: yyyy/mm/dd with the weekday under it.
+  const row = page.locator("li.tx", { hasText: "New World" });
+  if ((await row.locator(".num-date").textContent()) !== "2026/02/06" || (await row.locator(".weekday").textContent()) !== "Friday") throw new Error("the row's date is not yyyy/mm/dd with its weekday");
   await shot("5a-history");
+  // The same rows at desktop width: date | description | amount.
+  if (shots) { const size = page.viewportSize(); await page.setViewportSize({ width: 1100, height: 900 }); await shot("5a-history-desktop"); await page.setViewportSize(size); }
   await page.getByRole("tab", { name: "Aggregates" }).click();
   await page.getByRole("button", { name: "2026-02 transactions" }).click();
   await page.locator(".behind").getByText("New World").waitFor();

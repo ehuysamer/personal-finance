@@ -8,6 +8,7 @@ import Icon from "../components/Icon.vue";
 import Sheet from "../components/Sheet.vue";
 import ImportsourceEditor from "../components/ImportsourceEditor.vue";
 import TransactionList from "../components/TransactionList.vue";
+import TxRow from "../components/TxRow.vue";
 
 const api = inject("api");
 const reloadWorkspace = inject("reloadWorkspace");
@@ -267,11 +268,10 @@ const bankNames = computed(() => banks.value.map((bank) => bank.account).filter(
     <div v-if="tab === 'manual'">
       <div class="row end"><button class="primary" @click="manualDraft = { date: today(), account: bankNames[0] || '', description: '', amount: '' }"><Icon name="plus" /> Add transaction</button></div>
       <ul class="list" style="margin-top: 8px">
-        <li v-for="item in manual" :key="item.id" class="link" @click="manualDraft = { ...item }">
-          <div class="grow"><div class="title">{{ item.description || "(no description)" }}</div><div class="sub">{{ formatDate(item.date) }} · {{ item.account }}</div></div>
-          <div class="num" :class="{ neg: item.amount < 0 }">{{ formatMoney(item.amount) }}</div>
-          <button class="icon ghost" aria-label="Delete transaction" @click.stop="removeManual(item)"><Icon name="trash" /></button>
-        </li>
+        <TxRow v-for="item in manual" :key="item.id" :tx="item" class="link" @click="manualDraft = { ...item }">
+          <template #details>{{ item.account }} · manual</template>
+          <template #actions><button class="icon ghost" aria-label="Delete transaction" @click.stop="removeManual(item)"><Icon name="trash" /></button></template>
+        </TxRow>
         <li v-if="!manual.length" class="empty">No manual transactions</li>
       </ul>
     </div>

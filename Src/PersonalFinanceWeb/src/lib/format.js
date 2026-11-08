@@ -33,3 +33,7 @@ export function describeImport(result, { into } = {}) {
   else if (result.rejectedCount) text += `. ${result.rejectedCount} rows rejected`;
   return text;
 }
+
+// Transaction dates: yyyy/mm/dd, and the weekday shown under it.
+export function formatTxDate(text) { return text ? String(text).slice(0, 10).replaceAll("-", "/") : ""; }
+export function weekday(text) { return text ? new Date(`${String(text).slice(0, 10)}T00:00:00Z`).toLocaleDateString("en-NZ", { weekday: "long", timeZone: "UTC" }) : ""; }

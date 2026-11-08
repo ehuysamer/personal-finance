@@ -8,6 +8,7 @@ import Explore from "../components/Explore.vue";
 import JobProgress from "../components/JobProgress.vue";
 import TransactionList from "../components/TransactionList.vue";
 import NewAccountForm from "../components/NewAccountForm.vue";
+import TxRow from "../components/TxRow.vue";
 
 const api = inject("api");
 const tab = ref(state.route.parts[0] || "run");
@@ -167,7 +168,7 @@ async function moveRule(index, delta) {
       <div v-if="testResult" class="card">
         <strong>{{ testResult.count }} transactions match</strong><span v-if="testResult.takenEarlier" class="muted small"> ({{ testResult.takenEarlier }} go to an earlier rule)</span>
         <ul class="list" style="margin-top: 6px">
-          <li v-for="(tx, index) in testResult.transactions.slice(0, 15)" :key="index" :class="{ actual: tx.takenBy }"><div class="grow"><div class="title">{{ tx.description }}</div><div class="sub">{{ formatDate(tx.date) }}<template v-if="tx.takenBy"> · taken by {{ tx.takenBy }}</template></div></div><div class="num">{{ formatMoney(tx.amount) }}</div></li>
+          <TxRow v-for="(tx, index) in testResult.transactions.slice(0, 15)" :key="index" :tx="tx" :actual="!!tx.takenBy"><template #details>{{ tx.account }}<template v-if="tx.takenBy"> · taken by {{ tx.takenBy }}</template></template></TxRow>
         </ul>
       </div>
       <p v-if="error" class="error">{{ error }}</p>

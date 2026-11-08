@@ -316,6 +316,10 @@ value(t) = replay(t) + base_real × (1 + g)^t × s(m) × (1 + i_category)^t  [+ 
 
 ## Web (mobile-first)
 
+- [C] Every transaction list (history, chart history, aggregate drill-downs, unmatched, a datasource's and manual
+      transactions, rule tests, the import preview) leads with the date as yyyy/mm/dd with the weekday greyed under
+      it, then the description and its details, then the amount. On a phone the date and amount share the top line
+      and the description and details go below.
 - [C] Pop-ups (forms such as the rule editor) close only with their ✕ or when saved, never by a tap outside them.
 - [C] Designed for a phone first: bottom navigation Import / Accounts / Analysis / Forecast, header with tenant and
       active project switcher, cards and lists rather than wide tables, mappings edited one target field at a time.

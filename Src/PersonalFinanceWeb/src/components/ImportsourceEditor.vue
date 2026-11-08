@@ -2,7 +2,7 @@
 import { computed, inject, reactive, ref } from "vue";
 import { readBase64 } from "../lib/api.js";
 import { filesFromDrop } from "../lib/drop.js";
-import { formatMoney } from "../lib/format.js";
+import { formatMoney, formatTxDate, weekday } from "../lib/format.js";
 import { tenantPath, toast } from "../state.js";
 import Icon from "./Icon.vue";
 import Sheet from "./Sheet.vue";
@@ -190,7 +190,7 @@ async function save() {
       <div class="table-wrap">
         <table><thead><tr><th>Date</th><th>Account</th><th>Description</th><th class="num">Amount</th></tr></thead>
           <tbody>
-            <tr v-for="row in sample.normalised" :key="row.row"><td>{{ row.date }}</td><td>{{ row.account }}</td><td>{{ row.description }}</td><td class="num" :class="{ neg: row.amount < 0 }">{{ formatMoney(row.amount) }}</td></tr>
+            <tr v-for="row in sample.normalised" :key="row.row"><td>{{ formatTxDate(row.date) }}<div class="weekday">{{ weekday(row.date) }}</div></td><td>{{ row.account }}</td><td>{{ row.description }}</td><td class="num" :class="{ neg: row.amount < 0 }">{{ formatMoney(row.amount) }}</td></tr>
           </tbody>
         </table>
       </div>
