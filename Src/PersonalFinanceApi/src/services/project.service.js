@@ -3,6 +3,7 @@ import { keys } from "../lib/keys.js";
 import { UNCATEGORISED, compileRule, createCategoriser, validateRule } from "../lib/rules.js";
 import createCollection from "./collection.service.js";
 import { validateChart } from "./chart.service.js";
+import { DEFAULT_CURRENCY, currencyCode } from "../lib/currency.js";
 
 const SHORT_CODE = /^[A-Za-z_][A-Za-z0-9_]{0,31}$/;
 const RESERVED = new Set(["sum", "avg", "median", "min", "max", "first", "last", "middle", "base", "g", "s", "i", "t", "age", "value", "replay"]);
@@ -24,9 +25,10 @@ export default function createProjectService({ store, indexService, workspaceSer
     }
     doc.tags = [...new Set((Array.isArray(doc.tags) ? doc.tags : String(doc.tags || "").split(",")).map((tag) => String(tag).trim()).filter(Boolean))];
     doc.description = doc.description ? String(doc.description) : "";
+    doc.currency = doc.currency ? currencyCode(doc.currency) : (meta.currency || DEFAULT_CURRENCY);
     return doc;
   }
-  const accounts = createCollection({ store, indexService, clock, what: "account", summary: (doc) => ({ name: doc.name, shortCode: doc.shortCode, category: doc.category, tags: doc.tags, builtIn: doc.builtIn || undefined }), validate: validateAccount });
+  const accounts = createCollection({ store, indexService, clock, what: "account", summary: (doc) => ({ name: doc.name, shortCode: doc.shortCode, category: doc.category, tags: doc.tags, currency: doc.currency || null, builtIn: doc.builtIn || undefined }), validate: validateAccount });
 
   async function validateRuleDoc(doc, { tenant, projectId }) {
     const rule = validateRule(doc);
@@ -43,7 +45,7 @@ export default function createProjectService({ store, indexService, workspaceSer
     const category = meta.categories.find((item) => item.type === "expense")?.id || meta.categories[0]?.id;
     if (!category) return;
     const now = clock().toISOString();
-    await accounts.write(folder, { id: UNCATEGORISED, name: "Uncategorised", shortCode: "UNCAT", category, tags: [], description: "Transactions no rule matches", builtIn: true, createdAt: now, updatedAt: now });
+    await accounts.write(folder, { id: UNCATEGORISED, name: "Uncategorised", shortCode: "UNCAT", category, tags: [], description: "Transactions no rule matches", builtIn: true, currency: meta.currency || DEFAULT_CURRENCY, createdAt: now, updatedAt: now });
   }
 
   async function usage(tenant, projectId, accountId) {
@@ -72,7 +74,14 @@ export default function createProjectService({ store, indexService, workspaceSer
         if (!force && (usedBy.rules.length || usedBy.charts.length)) throw new HttpError(409, "ERR-IN-USE", "the account is used by rules or charts; pass force to delete it anyway", usedBy);
         return { ...(await accounts.remove(keys.accounts(tenant, projectId), id)), usedBy };
       },
-      usage
+      usage,
+      // Account id -> currency (an account without one has the project's).
+      async currencies(tenant, projectId) {
+        const meta = await project(tenant, projectId);
+        const list = await accounts.list(keys.accounts(tenant, projectId));
+        const map = new Map(list.map((account) => [account.id, account.currency || meta.currency || DEFAULT_CURRENCY]));
+        return (id) => map.get(id) || meta.currency || DEFAULT_CURRENCY;
+      }
     },
     rules: {
       list: (tenant, projectId) => rules.list(keys.rules(tenant, projectId)),

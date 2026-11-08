@@ -2,7 +2,7 @@
 import { computed, inject, ref, watch } from "vue";
 import { readBase64 } from "../lib/api.js";
 import { filesFromDrop } from "../lib/drop.js";
-import { describeImport, formatDate, formatMoney } from "../lib/format.js";
+import { CURRENCIES, describeImport, formatDate, formatMoney } from "../lib/format.js";
 import { datasources, go, state, tenantPath, toast } from "../state.js";
 import Icon from "../components/Icon.vue";
 import Sheet from "../components/Sheet.vue";
@@ -24,6 +24,7 @@ const error = ref("");
 const editing = ref(null);
 const creating = ref(false);
 const newName = ref("");
+const newCurrency = ref("NZD");
 const uploads = ref([]);
 const choose = ref(null);
 const cloneOf = ref(null);
@@ -92,7 +93,7 @@ watch(current, load, { immediate: true });
 
 async function createDatasource() {
   try {
-    const created = await api.post(`${tenantPath()}/datasources`, { name: newName.value });
+    const created = await api.post(`${tenantPath()}/datasources`, { name: newName.value, currency: newCurrency.value });
     await reloadWorkspace();
     creating.value = false; newName.value = "";
     go("import", created.id);
@@ -198,6 +199,8 @@ const bankNames = computed(() => banks.value.map((bank) => bank.account).filter(
     </ul>
     <Sheet v-if="creating" title="New datasource" @close="creating = false">
       <label class="field"><span>Name</span><input v-model="newName" placeholder="ASB everyday" @keyup.enter="createDatasource" /></label>
+      <label class="field"><span>Currency of its statements</span><input v-model="newCurrency" list="currencies" maxlength="3" autocapitalize="characters" aria-label="Datasource currency" /></label>
+      <datalist id="currencies"><option v-for="code in CURRENCIES" :key="code" :value="code" /></datalist>
       <div class="row end"><button class="primary" :disabled="!newName" @click="createDatasource">Create</button></div>
     </Sheet>
   </section>
@@ -207,7 +210,7 @@ const bankNames = computed(() => banks.value.map((bank) => bank.account).filter(
       <button class="ghost" @click="go('import')"><Icon name="back" /> Datasources</button>
       <button class="icon ghost" aria-label="Delete datasource" @click="removeDatasource"><Icon name="trash" /></button>
     </div>
-    <h1>{{ detail.name }}</h1>
+    <h1>{{ detail.name }} <span class="badge">{{ detail.currency }}</span></h1>
     <p v-if="error" class="error">{{ error }}</p>
     <div class="tabs" role="tablist">
       <button v-for="item in [['files', 'Files'], ['sources', 'Importsources'], ['banks', 'Balances'], ['manual', 'Manual'], ['transactions', 'Transactions']]" :key="item[0]" :class="{ on: tab === item[0] }" @click="tab = item[0]">{{ item[1] }}</button>
@@ -231,7 +234,7 @@ const bankNames = computed(() => banks.value.map((bank) => bank.account).filter(
 
     <div v-if="tab === 'sources'">
       <div v-if="editing !== null">
-        <ImportsourceEditor :datasource="current" :source="editing.id ? editing : null" @saved="editing = null; load()" @cancel="editing = null" />
+        <ImportsourceEditor :currency="detail.currency" :datasource="current" :source="editing.id ? editing : null" @saved="editing = null; load()" @cancel="editing = null" />
       </div>
       <template v-else>
         <div class="row end"><button class="primary" @click="editing = {}"><Icon name="plus" /> New importsource</button></div>
@@ -250,15 +253,15 @@ const bankNames = computed(() => banks.value.map((bank) => bank.account).filter(
       <p class="muted small">A total is a bank account's balance on a date (e.g. a statement's closing balance). Totals are the source of truth: analysis adds a balance adjustment for any difference.</p>
       <ul class="list">
         <li v-for="bank in banks" :key="bank.account">
-          <div class="grow"><div class="title">{{ bank.account || "(no account)" }}</div><div class="sub">{{ bank.transactions }} transactions<template v-if="bank.lastTotal"> · total {{ formatMoney(bank.lastTotal.balance) }} on {{ formatDate(bank.lastTotal.date) }}</template></div></div>
-          <div class="num">{{ formatMoney(bank.sum) }}</div>
+          <div class="grow"><div class="title">{{ bank.account || "(no account)" }}</div><div class="sub">{{ bank.transactions }} transactions<template v-if="bank.lastTotal"> · total {{ formatMoney(bank.lastTotal.balance, detail.currency) }} on {{ formatDate(bank.lastTotal.date) }}</template></div></div>
+          <div class="num">{{ formatMoney(bank.sum, detail.currency) }}</div>
         </li>
       </ul>
       <div class="spread"><h2>Totals</h2><button @click="totalDraft = { date: today(), account: bankNames[0] || '', balance: '' }"><Icon name="plus" /> Add total</button></div>
       <ul class="list">
         <li v-for="item in totals" :key="item.id">
           <div class="grow link" @click="totalDraft = { ...item }"><div class="title">{{ item.account }}</div><div class="sub">{{ formatDate(item.date) }}<template v-if="item.note"> · {{ item.note }}</template></div></div>
-          <div class="num">{{ formatMoney(item.balance) }}</div>
+          <div class="num">{{ formatMoney(item.balance, detail.currency) }}</div>
           <button class="icon ghost" aria-label="Delete total" @click="removeTotal(item)"><Icon name="trash" /></button>
         </li>
         <li v-if="!totals.length" class="empty">No totals</li>

@@ -123,8 +123,8 @@ async function deleted() { editing.value = null; await loadCharts(); choice.valu
             <span class="aggregate-values">
               <span v-for="(series, index) in data.series" :key="series.name" class="num small">
                 <span :style="{ color: colorFor(series, index) }" class="series-name">{{ series.label }}</span>
-                <template v-if="cell(series, row.i).actual !== null"> {{ formatMoney(cell(series, row.i).actual) }}</template>
-                <template v-if="cell(series, row.i).forecast !== null"> <em class="muted">forecast</em> {{ formatMoney(cell(series, row.i).forecast) }}</template>
+                <template v-if="cell(series, row.i).actual !== null"> {{ formatMoney(cell(series, row.i).actual, series.currency) }}</template>
+                <template v-if="cell(series, row.i).forecast !== null"> <em class="muted">forecast</em> {{ formatMoney(cell(series, row.i).forecast, series.currency) }}</template>
               </span>
             </span>
             <Icon :name="open[row.period] ? 'up' : 'down'" />

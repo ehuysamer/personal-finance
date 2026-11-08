@@ -69,8 +69,8 @@ function pick(event) {
       <div v-if="active !== null" class="card" style="margin: 6px 0 0">
         <strong>{{ buckets[active] }}</strong>
         <div v-for="(item, index) in series" :key="item.name" class="spread"><span :style="{ color: colorFor(item, index) }">{{ item.label }}</span><span class="num">
-          <template v-if="item.actual?.[active] !== null && item.actual?.[active] !== undefined">{{ formatMoney(item.actual[active]) }}</template>
-          <template v-if="item.forecast?.[active] !== null && item.forecast?.[active] !== undefined"> <em class="muted">forecast</em> {{ formatMoney(item.forecast[active]) }}</template>
+          <template v-if="item.actual?.[active] !== null && item.actual?.[active] !== undefined">{{ formatMoney(item.actual[active], item.currency) }}</template>
+          <template v-if="item.forecast?.[active] !== null && item.forecast?.[active] !== undefined"> <em class="muted">forecast</em> {{ formatMoney(item.forecast[active], item.currency) }}</template>
         </span></div>
       </div>
     </figcaption>

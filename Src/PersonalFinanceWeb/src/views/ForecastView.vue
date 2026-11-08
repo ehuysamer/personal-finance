@@ -38,6 +38,7 @@ async function loadCurrent() {
 onMounted(async () => { try { await loadList(); } catch (failure) { error.value = failure.message; } });
 watch(current, loadCurrent, { immediate: true });
 
+const currencyOf = (id) => accounts.value.find((account) => account.id === id)?.currency || project.value?.currency || "NZD";
 const accountName = (id) => accounts.value.find((account) => account.id === id)?.name || id;
 function blank() { return { name: "", frequency: "1m", horizon: { type: "duration", value: "10y" }, lookbackYears: 3, settings: { replay: true, seasonality: true, noise: false, maxGrowth: 0.25 }, inflation: {}, accounts: {}, generators: [] }; }
 // Inflation and growth are edited in percent; the API keeps fractions.
@@ -125,8 +126,8 @@ const models = computed(() => Object.entries(results.value?.model?.accounts || {
       <p class="small muted">What the forecast found per account at its last run: base (real money per month, today's prices), growth after inflation, recurring transactions it replays.</p>
       <ul class="list">
         <li v-for="item in models" :key="item.id" style="flex-wrap: wrap">
-          <div class="grow"><div class="title">{{ item.name }}</div><div class="sub">{{ item.method }} · base {{ formatMoney(item.base) }}/month · growth {{ formatPercent(item.g) }} · inflation {{ formatPercent(item.inflation) }}<template v-if="item.seasonality"> · seasonal</template> · spread {{ formatMoney(item.sigma) }}</div>
-            <div v-for="recurring in item.recurring" :key="recurring.key" class="sub">↻ {{ recurring.description }}: {{ formatMoney(recurring.amount) }} {{ recurring.cadence }}</div>
+          <div class="grow"><div class="title">{{ item.name }}</div><div class="sub">{{ item.method }} · base {{ formatMoney(item.base, currencyOf(item.id)) }}/month · growth {{ formatPercent(item.g) }} · inflation {{ formatPercent(item.inflation) }}<template v-if="item.seasonality"> · seasonal</template> · spread {{ formatMoney(item.sigma) }}</div>
+            <div v-for="recurring in item.recurring" :key="recurring.key" class="sub">↻ {{ recurring.description }}: {{ formatMoney(recurring.amount, currencyOf(item.id)) }} {{ recurring.cadence }}</div>
           </div>
         </li>
         <li v-if="!models.length" class="empty">Run the forecast to see its model</li>

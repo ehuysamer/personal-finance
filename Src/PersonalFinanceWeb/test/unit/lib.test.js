@@ -24,3 +24,13 @@ test("the API client sends the ID token and turns errors into Error with code an
   assert.equal(calls[0].url, "https://api.example/v1/me?q=a+b");
   assert.equal(calls[0].options.headers.Authorization, "Bearer token");
 });
+
+test("money with its currency: dollar prefixes, other currencies by code", async () => {
+  const { formatMoney, currencyLabel } = await import("../../src/lib/format.js");
+  assert.equal(formatMoney(-1234.5, "NZD"), "-NZ$1,234.50");
+  assert.equal(formatMoney(12, "USD"), "US$12.00");
+  assert.equal(formatMoney(-12, "EUR"), "EUR -12.00");
+  assert.equal(formatMoney(5), "5.00");
+  assert.equal(currencyLabel("AUD"), "A$");
+  assert.equal(currencyLabel("GBP"), "GBP");
+});

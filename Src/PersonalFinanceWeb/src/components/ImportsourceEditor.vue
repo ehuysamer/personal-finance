@@ -9,7 +9,7 @@ import Sheet from "./Sheet.vue";
 
 // One importsource: format, filename filter and the translators (per target field an ordered list of parts),
 // with "Import sample" to see a file's columns and the normalised rows before saving.
-const props = defineProps({ datasource: { type: String, required: true }, source: { type: Object, default: null } });
+const props = defineProps({ currency: { type: String, default: "" }, datasource: { type: String, required: true }, source: { type: Object, default: null } });
 const emit = defineEmits(["saved", "cancel"]);
 const api = inject("api");
 const TARGETS = [
@@ -190,7 +190,7 @@ async function save() {
       <div class="table-wrap">
         <table><thead><tr><th>Date</th><th>Account</th><th>Description</th><th class="num">Amount</th></tr></thead>
           <tbody>
-            <tr v-for="row in sample.normalised" :key="row.row"><td>{{ formatTxDate(row.date) }}<div class="weekday">{{ weekday(row.date) }}</div></td><td>{{ row.account }}</td><td>{{ row.description }}</td><td class="num" :class="{ neg: row.amount < 0 }">{{ formatMoney(row.amount) }}</td></tr>
+            <tr v-for="row in sample.normalised" :key="row.row"><td>{{ formatTxDate(row.date) }}<div class="weekday">{{ weekday(row.date) }}</div></td><td>{{ row.account }}</td><td>{{ row.description }}</td><td class="num" :class="{ neg: row.amount < 0 }">{{ formatMoney(row.amount, currency) }}</td></tr>
           </tbody>
         </table>
       </div>

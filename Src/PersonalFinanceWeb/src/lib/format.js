@@ -1,7 +1,17 @@
 const money = new Intl.NumberFormat("en-NZ", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 const compact = new Intl.NumberFormat("en-NZ", { notation: "compact", maximumFractionDigits: 1 });
 
-export function formatMoney(value) { return value === null || value === undefined || Number.isNaN(Number(value)) ? "" : money.format(Number(value)); }
+// Dollar currencies get a prefix (NZ$, US$, A$...); other currencies show their code (EUR 12.00).
+const DOLLARS = { NZD: "NZ$", USD: "US$", AUD: "A$", CAD: "CA$", HKD: "HK$", SGD: "S$", FJD: "FJ$", TWD: "NT$", MXN: "MX$" };
+export const CURRENCIES = ["NZD", "AUD", "USD", "EUR", "GBP", "CAD", "SGD", "HKD", "JPY", "CHF", "CNY", "FJD", "ZAR", "INR"];
+export function currencyLabel(code) { return code ? DOLLARS[code] || code : ""; }
+export function formatMoney(value, currency) {
+  if (value === null || value === undefined || Number.isNaN(Number(value))) return "";
+  const number = money.format(Math.abs(Number(value)));
+  const sign = Number(value) < 0 ? "-" : "";
+  if (!currency) return `${sign}${number}`;
+  return DOLLARS[currency] ? `${sign}${DOLLARS[currency]}${number}` : `${currency} ${sign}${number}`;
+}
 export function formatCompact(value) { return value === null || value === undefined ? "" : compact.format(Number(value)); }
 export function formatDate(text) {
   if (!text) return "";

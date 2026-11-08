@@ -12,7 +12,7 @@ defineProps({ tx: { type: Object, required: true }, actual: { type: Boolean, def
   <li class="tx" :class="{ actual }">
     <div class="tx-date"><div class="num-date">{{ formatTxDate(tx.date) }}</div><div class="weekday">{{ weekday(tx.date) }}</div></div>
     <div class="tx-body"><div class="title">{{ tx.description || "(no description)" }}</div><div class="sub"><slot name="details" /></div></div>
-    <div class="tx-amount num"><div :class="{ neg: tx.amount < 0 }">{{ formatMoney(tx.amount) }}</div><div class="sub small"><slot name="extra" /></div></div>
+    <div class="tx-amount num"><div :class="{ neg: tx.amount < 0 }">{{ formatMoney(tx.amount, tx.currency) }}</div><div class="sub small"><slot name="extra" /></div></div>
     <div v-if="$slots.actions" class="tx-actions"><slot name="actions" /></div>
   </li>
 </template>

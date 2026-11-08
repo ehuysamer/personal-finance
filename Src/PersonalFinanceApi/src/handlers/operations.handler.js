@@ -5,6 +5,7 @@ import { TEXT_OPERATORS } from "../lib/match.js";
 import { RULE_FIELDS, UNCATEGORISED, suggestRule } from "../lib/rules.js";
 import { METHODS } from "../lib/forecastModel.js";
 import { GENERATOR_TYPES } from "../lib/generators.js";
+import { withCurrency } from "../lib/currency.js";
 
 // Every operation is defined once: its REST route and its MCP tool come from this table, so MCP covers
 // everything REST does. scope: "user" (no tenant), "tenant" (path /v1/tenants/:tenant), "project"
@@ -77,7 +78,8 @@ export const operations = [
     const text = String(args.q || "").toLowerCase();
     const all = (await deps.importService.datasourceTransactions(tenant, args.datasource)).filter((tx) => !text || `${tx.description} ${tx.account}`.toLowerCase().includes(text)).sort((a, b) => b.date.localeCompare(a.date));
     const size = Math.min(500, Number(args.pageSize) || 50); const page = Math.max(1, Number(args.page) || 1);
-    return { items: all.slice((page - 1) * size, page * size), total: all.length, page, pageSize: size, pages: Math.ceil(all.length / size) };
+    const { currency } = await deps.workspaceService.get(tenant, "datasource", args.datasource);
+    return { items: withCurrency(all.slice((page - 1) * size, page * size), () => currency), total: all.length, page, pageSize: size, pages: Math.ceil(all.length / size) };
   } },
   ...["transaction", "total"].flatMap((kind) => {
     const list = kind === "total" ? "totals" : "manualTransactions";
@@ -85,7 +87,7 @@ export const operations = [
     const fields = kind === "total" ? { date: S, account: S, balance: N, note: S } : { date: S, account: S, description: S, amount: N, note: S };
     const what = kind === "total" ? "a total (a bank account's balance on a date; the source of truth: analysis adds a balance adjustment for any difference)" : "a manual transaction";
     return [
-      { name: `${kind === "total" ? "total" : "manual_transaction"}_list`, method: "get", path: base, scope: "tenant", description: `List ${kind === "total" ? "totals" : "manual transactions"}`, run: async ({ tenant, deps, args }) => ({ items: await deps.importService[list].list(tenant, args.datasource) }) },
+      { name: `${kind === "total" ? "total" : "manual_transaction"}_list`, method: "get", path: base, scope: "tenant", description: `List ${kind === "total" ? "totals" : "manual transactions"} (with the datasource's currency)`, run: async ({ tenant, deps, args }) => { const { currency } = await deps.workspaceService.get(tenant, "datasource", args.datasource); return { items: withCurrency(await deps.importService[list].list(tenant, args.datasource), () => currency) }; } },
       { name: `${kind === "total" ? "total" : "manual_transaction"}_create`, method: "post", path: base, scope: "tenant", status: 201, description: `Add ${what}`, input: fields, required: ["date", kind === "total" ? "balance" : "amount"], run: ({ tenant, deps, args }) => deps.importService[list].create(tenant, args.datasource, args) },
       { name: `${kind === "total" ? "total" : "manual_transaction"}_update`, method: "put", path: `${base}/:id`, scope: "tenant", description: `Change ${what}`, input: fields, run: ({ tenant, deps, args }) => deps.importService[list].update(tenant, args.datasource, args.id, args) },
       { name: `${kind === "total" ? "total" : "manual_transaction"}_delete`, method: "delete", path: `${base}/:id`, scope: "tenant", description: `Delete ${what}`, run: ({ tenant, deps, args }) => deps.importService[list].remove(tenant, args.datasource, args.id) }
@@ -95,12 +97,12 @@ export const operations = [
   // Projects and accounts
   { name: "project_list", method: "get", path: `${TP}/projects`, scope: "tenant", description: "List projects", run: async ({ tenant, deps }) => ({ items: await deps.workspaceService.list(tenant, "project") }) },
   { name: "project_get", method: "get", path: PP, scope: "project", description: "Get a project (datasources, birth date, categories)", run: ({ tenant, project, deps }) => deps.workspaceService.get(tenant, "project", project) },
-  { name: "project_create", method: "post", path: `${TP}/projects`, scope: "tenant", status: 201, description: "Create a project: { name, description?, datasources: [ids], birthDate? (yyyy-mm-dd, a person's or company's), categories?: [{ id, name, type: income|expense|asset|liability, inflation (0.03 = 3%) }] }", input: { id: S, name: S, description: S, datasources: A, birthDate: S, categories: A }, required: ["name"], run: async ({ tenant, deps, user, args }) => {
+  { name: "project_create", method: "post", path: `${TP}/projects`, scope: "tenant", status: 201, description: "Create a project: { name, description?, datasources: [ids], birthDate? (yyyy-mm-dd, a person's or company's), currency? (the accounts' default, NZD), categories?: [{ id, name, type: income|expense|asset|liability, inflation (0.03 = 3%) }] }", input: { id: S, name: S, description: S, datasources: A, birthDate: S, currency: S, categories: A }, required: ["name"], run: async ({ tenant, deps, user, args }) => {
     const project = await deps.workspaceService.create(tenant, "project", args);
     if (!(await deps.workspaceService.preferences(tenant, user.email)).activeProject) await deps.workspaceService.setActiveProject(tenant, user.email, project.id);
     return project;
   } },
-  { name: "project_update", method: "put", path: PP, scope: "project", description: "Update a project", input: { name: S, description: S, datasources: A, birthDate: S, categories: A }, run: ({ tenant, project, deps, args }) => { const { project: _p, ...rest } = args; return deps.workspaceService.update(tenant, "project", project, rest); } },
+  { name: "project_update", method: "put", path: PP, scope: "project", description: "Update a project", input: { name: S, description: S, datasources: A, birthDate: S, currency: S, categories: A }, run: ({ tenant, project, deps, args }) => { const { project: _p, ...rest } = args; return deps.workspaceService.update(tenant, "project", project, rest); } },
   { name: "project_delete", method: "delete", path: PP, scope: "project", description: "Delete a project", run: ({ tenant, project, deps }) => deps.workspaceService.remove(tenant, "project", project) },
   { name: "project_clone", method: "post", path: `${PP}/clone`, scope: "project", status: 201, description: "Clone a project: its settings, categories, accounts, rules, charts and forecast definitions (not analysis or forecast results); the copy becomes the active project. Run analysis_run on it", input: { name: S, id: S }, run: ({ tenant, project, deps, user, args }) => deps.categoryService.cloneProject(tenant, project, args, user) },
   { name: "category_create", method: "post", path: `${PP}/categories`, scope: "project", status: 201, description: "Add a category to the project: { name, type: income|expense|asset|liability, inflation (0.03 = 3% a year) }", input: { id: S, name: S, type: S, inflation: N }, required: ["name"], run: ({ tenant, project, deps, args }) => deps.categoryService.create(tenant, project, args) },
@@ -108,8 +110,8 @@ export const operations = [
   { name: "category_delete", method: "delete", path: `${PP}/categories/:category`, scope: "project", description: "Delete a category: its accounts move to moveTo (default: the first other category), chart series that totalled it total moveTo, and forecasts drop its inflation override", input: { moveTo: S }, run: ({ tenant, project, deps, args }) => deps.categoryService.remove(tenant, project, args.category, args) },
   { name: "account_list", method: "get", path: `${PP}/accounts`, scope: "project", description: "List a project's accounts", run: async ({ tenant, project, deps }) => ({ items: await deps.projectService.accounts.list(tenant, project) }) },
   { name: "account_get", method: "get", path: `${PP}/accounts/:account`, scope: "project", description: "Get an account", run: ({ tenant, project, deps, args }) => deps.projectService.accounts.get(tenant, project, args.account) },
-  { name: "account_create", method: "post", path: `${PP}/accounts`, scope: "project", status: 201, description: "Create an account: { name, category (category id), shortCode? (for charts and formulas), tags?: [], description? }", input: { id: S, name: S, category: S, shortCode: S, tags: A, description: S }, required: ["name", "category"], run: ({ tenant, project, deps, args }) => { const { project: _p, ...rest } = args; return deps.projectService.accounts.create(tenant, project, rest); } },
-  { name: "account_update", method: "put", path: `${PP}/accounts/:account`, scope: "project", description: "Update an account", input: { name: S, category: S, shortCode: S, tags: A, description: S }, run: ({ tenant, project, deps, args }) => { const { project: _p, account, ...rest } = args; return deps.projectService.accounts.update(tenant, project, account, rest); } },
+  { name: "account_create", method: "post", path: `${PP}/accounts`, scope: "project", status: 201, description: "Create an account: { name, category (category id), currency? (NZD, USD, EUR...; default the project's), shortCode? (for charts and formulas), tags?: [], description? }", input: { id: S, name: S, category: S, currency: S, shortCode: S, tags: A, description: S }, required: ["name", "category"], run: ({ tenant, project, deps, args }) => { const { project: _p, ...rest } = args; return deps.projectService.accounts.create(tenant, project, rest); } },
+  { name: "account_update", method: "put", path: `${PP}/accounts/:account`, scope: "project", description: "Update an account", input: { name: S, category: S, currency: S, shortCode: S, tags: A, description: S }, run: ({ tenant, project, deps, args }) => { const { project: _p, account, ...rest } = args; return deps.projectService.accounts.update(tenant, project, account, rest); } },
   { name: "account_delete", method: "delete", path: `${PP}/accounts/:account`, scope: "project", description: "Delete an account; refused while rules or charts use it unless force", input: { force: B }, run: ({ tenant, project, deps, args }) => deps.projectService.accounts.remove(tenant, project, args.account, { force: args.force === true || args.force === "true" }) },
 
   // Analysis
@@ -126,22 +128,28 @@ export const operations = [
     for (const datasource of meta.datasources) transactions.push(...(await deps.importService.datasourceTransactions(tenant, datasource)).map((tx) => ({ ...tx, datasource })));
     const rules = await deps.projectService.rules.all(tenant, project);
     const candidate = { order: Number.MAX_SAFE_INTEGER, ...(args.rule.id ? rules.find((rule) => rule.id === args.rule.id) : {}), ...args.rule };
-    return deps.projectService.rules.test(transactions, rules, candidate, Number(args.limit) || 50);
+    const currencies = new Map();
+    for (const datasource of meta.datasources) currencies.set(datasource, (await deps.workspaceService.get(tenant, "datasource", datasource)).currency);
+    const result = await deps.projectService.rules.test(transactions, rules, candidate, Number(args.limit) || 50);
+    return { ...result, transactions: withCurrency(result.transactions, (tx) => currencies.get(tx.datasource)) };
   } },
   { name: "unmatched_transactions", method: "get", path: `${PP}/unmatched`, scope: "project", description: "After analysis: the transactions no rule matched (the uncategorised account), paged, newest first, each with a suggested rule (name and a description condition) to fill in and save with rule_create", input: { page: N, pageSize: N, q: S, sort: S, order: S }, run: async ({ tenant, project, deps, args }) => {
     const page = await deps.resultsService.history(tenant, project, "analysis", UNCATEGORISED, args);
-    return { ...page, items: page.items.map((tx) => ({ ...tx, suggestedRule: suggestRule(tx) })) };
+    const currencyOf = await deps.projectService.accounts.currencies(tenant, project);
+    return { ...page, items: withCurrency(page.items, () => currencyOf(UNCATEGORISED)).map((tx) => ({ ...tx, suggestedRule: suggestRule(tx) })) };
   } },
   { name: "rule_suggest", method: "post", path: `${PP}/rules-suggest`, scope: "project", description: "A suggested rule for a transaction ({ description, bankAccount?, date?, amount? }): its beneficiary words as a description condition", input: { transaction: O }, required: ["transaction"], run: async ({ args }) => suggestRule(args.transaction || {}) },
   { name: "analysis_run", method: "post", path: `${PP}/analysis`, scope: "project", status: 202, description: "Analyse: put the project's transactions into accounts by the rules and build running totals and aggregates. Runs as a job; follow it with job_get", run: ({ tenant, project, deps, user }) => deps.jobService.start(tenant, project, "analysis", {}, user) },
   { name: "analysis_status", method: "get", path: `${PP}/analysis`, scope: "project", description: "The last analysis: when, counts per account, last date, warnings", run: async ({ tenant, project, deps }) => (await deps.analysisService.meta(tenant, project)) || { status: "none" } },
   { name: "account_aggregates", method: "get", path: `${PP}/accounts/:account/aggregates`, scope: "project", description: "An account's monthly, quarterly and yearly sum, running total, count, average, min and max (analysis, or a forecast)", input: { forecast: S }, run: async ({ tenant, project, deps, args }) => (await deps.resultsService.aggregates(tenant, project, args.forecast ? deps.forecastService.scope(args.forecast) : "analysis", args.account)) || { account: args.account, monthly: [], quarterly: [], yearly: [] } },
   { name: "account_history", method: "get", path: `${PP}/accounts/:account/transactions`, scope: "project", description: "An account's transactions, paged, newest first by default (sort: date|amount, order: desc|asc, from, to, q). With forecast: that forecast's transactions, and with includeActuals also the actual ones (kind: actual|forecast)", input: { page: N, pageSize: N, sort: S, order: S, from: S, to: S, q: S, forecast: S, includeActuals: B }, run: async ({ tenant, project, deps, args }) => {
-    if (!args.forecast) return deps.resultsService.history(tenant, project, "analysis", args.account, args);
+    const currency = (await deps.projectService.accounts.currencies(tenant, project))(args.account);
+    const priced = (page) => ({ ...page, items: withCurrency(page.items, () => currency) });
+    if (!args.forecast) return priced(await deps.resultsService.history(tenant, project, "analysis", args.account, args));
     const scope = deps.forecastService.scope(args.forecast);
-    if (!(args.includeActuals === true || args.includeActuals === "true")) return deps.resultsService.history(tenant, project, scope, args.account, args);
+    if (!(args.includeActuals === true || args.includeActuals === "true")) return priced(await deps.resultsService.history(tenant, project, scope, args.account, args));
     const all = [...await deps.resultsService.all(tenant, project, "analysis", args.account), ...await deps.resultsService.all(tenant, project, scope, args.account)];
-    return deps.resultsService.page(all, args);
+    return priced(deps.resultsService.page(all, args));
   } },
   { name: "chart_list", method: "get", path: `${PP}/charts`, scope: "project", description: "List saved charts", run: async ({ tenant, project, deps }) => ({ items: await deps.projectService.charts.list(tenant, project) }) },
   { name: "chart_get", method: "get", path: `${PP}/charts/:chart`, scope: "project", description: "Get a saved chart", run: ({ tenant, project, deps, args }) => deps.projectService.charts.get(tenant, project, args.chart) },

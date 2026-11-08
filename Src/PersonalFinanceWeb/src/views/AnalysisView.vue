@@ -57,11 +57,12 @@ const rulesChanged = ref(false);
 function ruleFromTransaction(tx) {
   const suggestion = tx.suggestedRule;
   addingAccount.value = false;
-  ruleDraft.value = { name: suggestion.name, account: "", enabled: true, conditions: suggestion.conditions.map((condition) => ({ ...condition })), date: { start: "", end: "" }, amount: { min: "", max: "" }, example: suggestion.example };
+  ruleDraft.value = { name: suggestion.name, account: "", enabled: true, conditions: suggestion.conditions.map((condition) => ({ ...condition })), date: { start: "", end: "" }, amount: { min: "", max: "" }, example: { ...suggestion.example, currency: tx.currency } };
   testResult.value = null;
   testRule();
 }
 
+const currencyOf = (id) => accounts.value.find((account) => account.id === id)?.currency || project.value?.currency || "NZD";
 const accountName = (id) => accounts.value.find((account) => account.id === id)?.name || id;
 const accountSummary = computed(() => (status.value?.accounts || []).map((item) => ({ ...item, name: accountName(item.id) })).sort((a, b) => Math.abs(b.running) - Math.abs(a.running)));
 
@@ -108,7 +109,7 @@ async function moveRule(index, delta) {
       <ul class="list">
         <li v-for="item in accountSummary" :key="item.id" class="link" @click="historyAccount = item.id; tab = 'explore'">
           <div class="grow"><div class="title">{{ item.name }}</div><div class="sub">{{ item.count }} transactions<template v-if="item.first"> · {{ formatDate(item.first) }} – {{ formatDate(item.last) }}</template></div></div>
-          <div class="num" :class="{ neg: item.running < 0 }">{{ formatMoney(item.running) }}</div>
+          <div class="num" :class="{ neg: item.running < 0 }">{{ formatMoney(item.running, currencyOf(item.id)) }}</div>
         </li>
         <li v-if="!accountSummary.length" class="empty">Not analysed yet</li>
       </ul>
@@ -146,9 +147,9 @@ async function moveRule(index, delta) {
           </div>
         </div>
       </div>
-      <NewAccountForm v-if="addingAccount && project" :categories="project.categories" :name="ruleDraft.name" @created="accountAdded" @categories-changed="reloadProject" @cancel="addingAccount = false" />
+      <NewAccountForm v-if="addingAccount && project" :categories="project.categories" :currency="project.currency || 'NZD'" :name="ruleDraft.name" @created="accountAdded" @categories-changed="reloadProject" @cancel="addingAccount = false" />
       <label class="check"><input v-model="ruleDraft.enabled" type="checkbox" />Enabled</label>
-      <p v-if="ruleDraft.example" class="card small">From: {{ ruleDraft.example.description }} · {{ formatDate(ruleDraft.example.date) }} · {{ formatMoney(ruleDraft.example.amount) }}</p>
+      <p v-if="ruleDraft.example" class="card small">From: {{ ruleDraft.example.description }} · {{ formatDate(ruleDraft.example.date) }} · {{ formatMoney(ruleDraft.example.amount, ruleDraft.example.currency) }}</p>
       <h3>All of these</h3>
       <div v-for="(condition, index) in ruleDraft.conditions" :key="index" class="card">
         <div class="grid2">

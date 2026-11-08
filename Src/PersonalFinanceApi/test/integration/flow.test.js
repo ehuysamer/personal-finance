@@ -318,3 +318,36 @@ test("charts: several accounts in one series, axes, daily and weekly buckets, an
   assert.equal((await api.call("POST", `${P}/chart-data`, { chart: { ...chart, series: [{ name: "X", type: "accounts", refs: [] }] } })).status, 400);
   assert.equal((await api.call("POST", `${P}/chart-data`, { chart: { ...chart, series: [{ name: "X", type: "account", ref: "INC", axis: "top" }] } })).status, 400);
 });
+
+test("currencies: projects and accounts have one (the project's by default) and every transaction carries it", async (t) => {
+  const api = await startTestApi();
+  t.after(() => api.close());
+  const tenant = (await api.call("GET", "/v1/me")).body.tenants[0].id;
+  const T = `/v1/tenants/${tenant}`;
+  const ds = (await api.call("POST", `${T}/datasources`, { name: "US bank", currency: "usd" })).body;
+  assert.equal(ds.currency, "USD");
+  await api.call("POST", `${T}/datasources/${ds.id}/manual-transactions`, { date: "2026-01-02", account: "A", description: "Amazon", amount: -20 });
+  await api.call("POST", `${T}/datasources/${ds.id}/manual-transactions`, { date: "2026-01-03", account: "A", description: "Cafe", amount: -5 });
+  assert.equal((await api.call("GET", `${T}/datasources/${ds.id}/transactions`)).body.items[0].currency, "USD");
+  assert.equal((await api.call("GET", `${T}/datasources/${ds.id}/manual-transactions`)).body.items[0].currency, "USD");
+  const project = (await api.call("POST", `${T}/projects`, { name: "Home", datasources: [ds.id] })).body;
+  assert.equal(project.currency, "NZD");
+  const P = `${T}/projects/${project.id}`;
+  const shopping = (await api.call("POST", `${P}/accounts`, { name: "Shopping", category: "other", currency: "USD" })).body;
+  const cafes = (await api.call("POST", `${P}/accounts`, { name: "Cafes", category: "food" })).body;
+  assert.deepEqual([shopping.currency, cafes.currency], ["USD", "NZD"]);
+  assert.equal((await api.call("POST", `${P}/accounts`, { name: "Bad", category: "food", currency: "dollars" })).status, 400);
+  await api.call("POST", `${P}/rules`, { name: "Amazon", account: shopping.id, conditions: [{ field: "description", op: "exact", value: "Amazon" }] });
+  await api.call("POST", `${P}/rules`, { name: "Cafe", account: cafes.id, conditions: [{ field: "description", op: "exact", value: "Cafe" }] });
+  const tested = await api.call("POST", `${P}/rules-test`, { rule: { name: "x", conditions: [{ field: "description", op: "exact", value: "Amazon" }] } });
+  assert.equal(tested.body.transactions[0].currency, "USD", "rule tests show the datasource's currency");
+  await api.call("POST", `${P}/analysis`);
+  await api.drain();
+  assert.equal((await api.call("GET", `${P}/accounts/${shopping.id}/transactions`)).body.items[0].currency, "USD");
+  assert.equal((await api.call("GET", `${P}/accounts/${cafes.id}/transactions`)).body.items[0].currency, "NZD");
+  const chart = { name: "Both", series: [{ name: "S", type: "account", ref: shopping.id, measure: "sum" }, { name: "B", type: "accounts", refs: [shopping.id, cafes.id], measure: "sum" }] };
+  const data = await api.call("POST", `${P}/chart-data`, { chart });
+  assert.deepEqual(data.body.series.map((series) => series.currency), ["USD", null], "a series has a currency when all its accounts share one");
+  const behind = await api.call("POST", `${P}/chart-transactions`, { chart });
+  assert.deepEqual(behind.body.items.map((tx) => [tx.description, tx.currency]).sort(), [["Amazon", "USD"], ["Cafe", "NZD"]]);
+});

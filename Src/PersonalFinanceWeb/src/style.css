@@ -127,14 +127,13 @@ button.aggregate-row .title { flex: 0 0 auto; min-width: 84px; font-weight: 550;
 .tx-date { grid-area: date; font-variant-numeric: tabular-nums; }
 .tx-date .weekday { color: var(--muted); font-size: .8rem; }
 .tx-body { grid-area: body; min-width: 0; }
-.tx-body .title { font-weight: 550; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.tx-body .sub { color: var(--muted); font-size: .82rem; overflow-wrap: anywhere; }
+.tx-body .title { font-weight: 550; white-space: normal; overflow-wrap: anywhere; }
+.tx-body .sub { color: var(--muted); font-size: .82rem; white-space: normal; overflow: visible; overflow-wrap: anywhere; }
 .tx-amount { grid-area: amount; }
 .tx-actions { grid-area: actions; display: flex; justify-content: flex-end; gap: 4px; }
 .list > li.tx:not(:has(.tx-actions)) { grid-template-areas: "date body amount"; }
 @media (max-width: 520px) {
   .list > li.tx { grid-template-columns: minmax(0, 1fr) auto; grid-template-areas: "date amount" "body body" "actions actions"; }
   .list > li.tx:not(:has(.tx-actions)) { grid-template-areas: "date amount" "body body"; }
-  .tx-body .title { white-space: normal; }
 }
 td .weekday { color: var(--muted); font-size: .75rem; }

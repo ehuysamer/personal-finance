@@ -46,7 +46,7 @@ function source(tx) {
     <ul class="list">
       <TxRow v-for="(tx, index) in result.items" :key="`${tx.date}-${index}-${tx.seq ?? ''}`" :tx="tx" :actual="greyActuals && tx.kind === 'actual'">
         <template #details><template v-if="tx.seriesLabel">{{ tx.seriesLabel }}<template v-if="tx.accountName !== tx.seriesLabel"> ({{ tx.accountName }})</template></template><template v-else-if="tx.bankAccount || tx.account">{{ tx.bankAccount || tx.account }}</template> · {{ source(tx) }}<template v-if="greyActuals"> · {{ tx.kind }}</template></template>
-        <template v-if="showRunning && tx.running !== undefined" #extra>{{ formatMoney(tx.running) }}</template>
+        <template v-if="showRunning && tx.running !== undefined" #extra>{{ formatMoney(tx.running, tx.currency) }}</template>
         <template v-if="actionLabel" #actions><button class="small" @click="emit('action', tx)">{{ actionLabel }}</button></template>
       </TxRow>
       <li v-if="!loading && !result.items.length" class="empty">No transactions</li>

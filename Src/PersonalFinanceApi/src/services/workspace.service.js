@@ -1,4 +1,5 @@
 import HttpError from "../models/httpError.model.js";
+import { DEFAULT_CURRENCY, currencyCode } from "../lib/currency.js";
 import { assertId, keys, timestamp, uniqueId } from "../lib/keys.js";
 import { getJson, putJson, softDelete, updateJson } from "../lib/json.js";
 
@@ -46,7 +47,7 @@ export default function createWorkspaceService({ store, indexService, clock = ()
     doc.name = String(doc.name || "").trim();
     if (!doc.name) throw new HttpError(400, "ERR-NAME", "name is required");
     if (doc.kind === "datasource") {
-      doc.currency = String(doc.currency || "NZD").toUpperCase();
+      doc.currency = currencyCode(doc.currency || DEFAULT_CURRENCY);
     } else {
       const datasources = new Set((await list(tenant, "datasource")).map((item) => item.id));
       doc.datasources = [...new Set(Array.isArray(doc.datasources) ? doc.datasources : [])];
@@ -54,6 +55,8 @@ export default function createWorkspaceService({ store, indexService, clock = ()
       if (unknown.length) throw new HttpError(400, "ERR-DATASOURCE", `unknown datasources: ${unknown.join(", ")}`);
       if (doc.birthDate && !isDate(doc.birthDate)) throw new HttpError(400, "ERR-DATE", "birthDate must be yyyy-mm-dd");
       doc.birthDate = doc.birthDate || null;
+      // The default currency of the project's accounts.
+      doc.currency = currencyCode(doc.currency || DEFAULT_CURRENCY);
       doc.categories = normaliseCategories(doc.categories);
     }
     return doc;

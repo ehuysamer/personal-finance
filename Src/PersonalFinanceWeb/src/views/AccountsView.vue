@@ -1,10 +1,11 @@
 <script setup>
 import { computed, inject, onMounted, ref } from "vue";
 import { datasources, go, projectPath, state, tenantPath, toast } from "../state.js";
-import { formatPercent } from "../lib/format.js";
+import { currencyLabel, formatPercent } from "../lib/format.js";
 import Icon from "../components/Icon.vue";
 import Sheet from "../components/Sheet.vue";
 import CategorySelect from "../components/CategorySelect.vue";
+import CurrencyInput from "../components/CurrencyInput.vue";
 
 const api = inject("api");
 const reloadWorkspace = inject("reloadWorkspace");
@@ -28,11 +29,11 @@ onMounted(async () => {
   if (state.route.parts[0] === "new-project" || !state.workspace.activeProject) newProject();
 });
 
-function newProject() { projectDraft.value = { name: "", datasources: datasources().map((item) => item.id), birthDate: "" }; }
+function newProject() { projectDraft.value = { name: "", datasources: datasources().map((item) => item.id), birthDate: "", currency: "NZD" }; }
 function editProject() { projectDraft.value = JSON.parse(JSON.stringify(project.value)); }
 async function saveProject() {
   const draft = projectDraft.value;
-  const body = { name: draft.name, description: draft.description, datasources: draft.datasources, birthDate: draft.birthDate || null };
+  const body = { name: draft.name, description: draft.description, datasources: draft.datasources, birthDate: draft.birthDate || null, currency: draft.currency || "NZD" };
   try {
     if (draft.id) await api.put(`${tenantPath()}/projects/${draft.id}`, body);
     else { const created = await api.post(`${tenantPath()}/projects`, body); await api.put(`${tenantPath()}/active-project`, { project: created.id }); }
@@ -86,11 +87,11 @@ async function cloneProject() {
   } catch (failure) { error.value = failure.message; }
 }
 
-function newAccount() { accountDraft.value = { name: "", category: project.value.categories[0]?.id, shortCode: "", tags: "", description: "" }; }
-function editAccount(account) { accountDraft.value = { ...account, tags: (account.tags || []).join(", ") }; }
+function newAccount() { accountDraft.value = { name: "", category: project.value.categories[0]?.id, currency: project.value.currency || "NZD", shortCode: "", tags: "", description: "" }; }
+function editAccount(account) { accountDraft.value = { ...account, currency: account.currency || project.value.currency || "NZD", tags: (account.tags || []).join(", ") }; }
 async function saveAccount() {
   const draft = accountDraft.value;
-  const body = { name: draft.name, category: draft.category, shortCode: draft.shortCode || null, tags: String(draft.tags || "").split(",").map((tag) => tag.trim()).filter(Boolean), description: draft.description };
+  const body = { name: draft.name, category: draft.category, currency: draft.currency, shortCode: draft.shortCode || null, tags: String(draft.tags || "").split(",").map((tag) => tag.trim()).filter(Boolean), description: draft.description };
   try {
     if (draft.id) await api.put(`${projectPath()}/accounts/${draft.id}`, body); else await api.post(`${projectPath()}/accounts`, body);
     accountDraft.value = null; toast("Account saved"); await load();
@@ -126,7 +127,7 @@ const age = computed(() => { if (!project.value?.birthDate) return null; const m
         <h3>{{ group.category.name }} <span class="badge">{{ group.category.type }}</span> <span class="muted small">inflation {{ formatPercent(group.category.inflation) }}</span></h3>
         <ul class="list">
           <li v-for="account in group.accounts" :key="account.id" class="link" @click="editAccount(account)">
-            <div class="grow"><div class="title">{{ account.name }}</div><div class="sub"><template v-if="account.shortCode">{{ account.shortCode }} · </template>{{ (account.tags || []).join(", ") || "no tags" }}</div></div>
+            <div class="grow"><div class="title">{{ account.name }}</div><div class="sub">{{ currencyLabel(account.currency || project.currency || "NZD") }} · <template v-if="account.shortCode">{{ account.shortCode }} · </template>{{ (account.tags || []).join(", ") || "no tags" }}</div></div>
             <Icon name="chevron" />
           </li>
           <li v-if="!group.accounts.length" class="empty">No accounts</li>
@@ -139,6 +140,7 @@ const age = computed(() => { if (!project.value?.birthDate) return null; const m
     <Sheet v-if="projectDraft" :title="projectDraft.id ? 'Edit project' : 'New project'" @close="projectDraft = null">
       <label class="field"><span>Name</span><input v-model="projectDraft.name" placeholder="Household" /></label>
       <label class="field"><span>Birth date (yours, or the company's founding date)</span><input v-model="projectDraft.birthDate" type="date" /></label>
+      <CurrencyInput v-model="projectDraft.currency" label="Default currency of new accounts" />
       <fieldset class="card"><legend class="small">Datasources</legend>
         <label v-for="item in datasources()" :key="item.id" class="check"><input v-model="projectDraft.datasources" type="checkbox" :value="item.id" />{{ item.name }}</label>
         <p v-if="!datasources().length" class="small muted">Create datasources in Import first.</p>
@@ -177,6 +179,7 @@ const age = computed(() => { if (!project.value?.birthDate) return null; const m
       <label class="field"><span>Name</span><input v-model="accountDraft.name" placeholder="Groceries" /></label>
       <div class="grid2">
         <CategorySelect v-model="accountDraft.category" :categories="project.categories" @created="load" />
+        <CurrencyInput v-model="accountDraft.currency" />
         <label class="field"><span>Short code (for charts and formulas)</span><input v-model="accountDraft.shortCode" placeholder="FOOD" autocapitalize="characters" /></label>
       </div>
       <label class="field"><span>Tags (comma separated)</span><input v-model="accountDraft.tags" placeholder="essential, weekly" /></label>

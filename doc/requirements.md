@@ -319,7 +319,12 @@ value(t) = replay(t) + base_real × (1 + g)^t × s(m) × (1 + i_category)^t  [+ 
 - [C] Every transaction list (history, chart history, aggregate drill-downs, unmatched, a datasource's and manual
       transactions, rule tests, the import preview) leads with the date as yyyy/mm/dd with the weekday greyed under
       it, then the description and its details, then the amount. On a phone the date and amount share the top line
-      and the description and details go below.
+      and the description and details go below. Long descriptions and details wrap onto the next line.
+- [C] **Currencies:** a project has a default currency (NZD) and each account its own (the project's unless chosen);
+      a datasource has the currency of its statements. Every transaction is shown with its account's currency (a
+      datasource's own lists with the datasource's): dollar currencies with a prefix (NZ$, US$, A$, CA$, ...), others
+      by code (EUR 12.00). A chart series has a currency when all its accounts share one. No conversion between
+      currencies (yet).
 - [C] Pop-ups (forms such as the rule editor) close only with their ✕ or when saved, never by a tap outside them.
 - [C] Designed for a phone first: bottom navigation Import / Accounts / Analysis / Forecast, header with tenant and
       active project switcher, cards and lists rather than wide tables, mappings edited one target field at a time.

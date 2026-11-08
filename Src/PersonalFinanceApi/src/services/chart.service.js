@@ -90,8 +90,12 @@ export default function createChartService({ workspaceService, projectService, r
       }
       return cache.get(key);
     };
+    const currencyOf = await projectService.accounts.currencies(tenant, project);
+    const currencies = {};
     for (const series of chart.series.filter((item) => item.type !== "calculate")) {
       const ids = accountsFor(tenant, project, series, accounts);
+      const codes = [...new Set(ids.map(currencyOf))];
+      currencies[series.name] = codes.length === 1 ? codes[0] : null;
       bySeries[series.name] = {};
       for (const { kind, scope } of scopes) {
         const list = (await Promise.all(ids.map((id) => bucketOf(scope, id)))).filter(Boolean);
@@ -124,7 +128,7 @@ export default function createChartService({ workspaceService, projectService, r
     return {
       name: chart.name, bucket: chart.bucket, forecast: chart.forecast, buckets, leftLabel: chart.leftLabel, rightLabel: chart.rightLabel,
       series: chart.series.filter((item) => !item.hidden).map((item) => ({
-        name: item.name, label: item.label || item.name, color: item.color, axis: item.axis,
+        name: item.name, label: item.label || item.name, color: item.color, axis: item.axis, currency: currencies[item.name] || null,
         actual: bySeries[item.name].actual ? buckets.map((period) => bySeries[item.name].actual.get(period) ?? null) : null,
         forecast: bySeries[item.name].forecast ? buckets.map((period) => bySeries[item.name].forecast.get(period) ?? null) : null
       }))
@@ -138,6 +142,7 @@ export default function createChartService({ workspaceService, projectService, r
     const chart = validateChart(input);
     const accounts = await projectService.accounts.list(tenant, project);
     const names = new Map(accounts.map((account) => [account.id, account.name]));
+    const currencyOf = await projectService.accounts.currencies(tenant, project);
     const byName = new Map(chart.series.map((item) => [item.name, item]));
     const sources = (name, seen = new Set()) => {
       if (seen.has(name)) return [];
@@ -167,7 +172,7 @@ export default function createChartService({ workspaceService, projectService, r
             const label = series.label || series.name;
             const known = index.get(seen);
             if (known) { if (!known.seriesNames.includes(series.name)) { known.seriesNames.push(series.name); known.seriesLabel += `, ${label}`; } continue; }
-            const entry = { ...tx, kind: tx.kind || kind, accountId: id, accountName: names.get(id) || id, series: series.name, seriesNames: [series.name], seriesLabel: label };
+            const entry = { ...tx, kind: tx.kind || kind, accountId: id, accountName: names.get(id) || id, currency: currencyOf(id), series: series.name, seriesNames: [series.name], seriesLabel: label };
             index.set(seen, entry);
             list.push(entry);
           }

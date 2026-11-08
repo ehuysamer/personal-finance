@@ -59,7 +59,7 @@ try {
   await page.getByText("10 rows, columns: Date, Details, Debit, Credit").waitFor();
   await page.getByRole("region", { name: "Sample rows" }).getByRole("cell", { name: "SALARY ACME" }).first().waitFor();
   await page.getByRole("button", { name: "Preview with this mapping" }).click();
-  await page.getByRole("cell", { name: "-120.40" }).waitFor();
+  await page.getByRole("cell", { name: "-NZ$120.40" }).waitFor();
   await shot("1-importsource");
   await page.getByRole("button", { name: "Save importsource" }).click();
   await page.getByText("sample-statement").first().waitFor();
@@ -85,6 +85,7 @@ try {
   // (its accounts move).
   await page.getByRole("button", { name: "Account", exact: true }).click();
   await page.getByPlaceholder("Groceries").fill("Vet");
+  await page.getByLabel("Currency", { exact: true }).fill("USD");
   await page.getByRole("button", { name: "Add a category" }).click();
   await page.getByLabel("New category name").fill("Pets");
   await page.getByRole("button", { name: "Add category" }).click();
@@ -92,6 +93,7 @@ try {
   { const value = await page.getByLabel("Category", { exact: true }).inputValue(); if (value !== "pets") throw new Error(`the new category was not selected (${value}; ${await page.getByRole("dialog").innerText()})`); }
   await page.getByRole("dialog").getByRole("button", { name: "Save" }).click();
   await page.locator("h3", { hasText: "Pets" }).waitFor();
+  await page.locator("li", { hasText: "Vet" }).getByText(/^US\$ ·/).waitFor();
   await page.getByRole("button", { name: "Manage categories" }).click();
   await page.getByRole("button", { name: "Rename Pets" }).click();
   await page.getByRole("dialog", { name: /^Edit Pets/ }).getByPlaceholder("Pets").fill("Animals");
@@ -176,6 +178,8 @@ try {
   // Dates lead each row: yyyy/mm/dd with the weekday under it.
   const row = page.locator("li.tx", { hasText: "New World" });
   if ((await row.locator(".num-date").textContent()) !== "2026/02/06" || (await row.locator(".weekday").textContent()) !== "Friday") throw new Error("the row's date is not yyyy/mm/dd with its weekday");
+  // Amounts carry the account's currency.
+  if ((await row.locator(".tx-amount > div").first().textContent()) !== "-NZ$110.00") throw new Error("the amount does not show the account's currency");
   await shot("5a-history");
   // The same rows at desktop width: date | description | amount.
   if (shots) { const size = page.viewportSize(); await page.setViewportSize({ width: 1100, height: 900 }); await shot("5a-history-desktop"); await page.setViewportSize(size); }
@@ -207,7 +211,7 @@ try {
   await page.locator("svg[role=img] path[stroke-dasharray]").first().waitFor();
   await shot("7-forecast-chart");
   await page.getByRole("button", { name: "Model" }).click();
-  await page.getByText(/SALARY ACME: 5,000.00 monthly/).waitFor();
+  await page.getByText(/SALARY ACME: NZ\$5,000.00 monthly/).waitFor();
 
   // Documents: add a statement, see it, import it (it stays), and find it from a datasource's Files tab.
   await page.getByRole("link", { name: "Documents" }).click();
