@@ -42,8 +42,10 @@ export default function createCategoryService({ store, workspaceService, project
     const charts = [];
     for (const item of await projectService.charts.list(tenant, projectId)) {
       const chart = await projectService.charts.get(tenant, projectId, item.id);
-      if (!(chart.series || []).some((series) => series.type === "category" && series.ref === categoryId)) continue;
-      await projectService.charts.update(tenant, projectId, chart.id, { series: chart.series.map((series) => (series.type === "category" && series.ref === categoryId ? { ...series, ref: target } : series)) });
+      const uses = (series) => (series.type === "category" && series.ref === categoryId) || (series.type === "categories" && (series.refs || []).includes(categoryId));
+      if (!(chart.series || []).some(uses)) continue;
+      const repoint = (series) => (series.type === "category" ? { ...series, ref: target } : { ...series, refs: [...new Set(series.refs.map((ref) => (ref === categoryId ? target : ref)))] });
+      await projectService.charts.update(tenant, projectId, chart.id, { series: chart.series.map((series) => (uses(series) ? repoint(series) : series)) });
       charts.push(chart.id);
     }
     // Forecasts drop their inflation override for the category.

@@ -2,11 +2,13 @@ import HttpError from "../models/httpError.model.js";
 import { BUCKETS, CHART_BUCKETS, MEASURES, aggregateFor, combineAggregates, periodOf } from "../lib/aggregate.js";
 import { evaluateExpression, expressionReferences, isLineName, parseExpression } from "../lib/chartExpression.js";
 
-export const SERIES_TYPES = ["account", "accounts", "category", "tag", "calculate"];
+export const SERIES_TYPES = ["account", "accounts", "category", "categories", "categoryTypes", "tag", "calculate"];
+export const CATEGORY_TYPES = ["income", "expense", "asset", "liability"];
 export const AXES = ["left", "right", "virtual"];
 
 // Charts: named per project; each series is an account (by short code or id), the sum of several accounts (refs), a
-// category or tag total, or a calculation over other series (the Timeseries expression language). Each series has a
+// category total, the total of several categories (refs), the total of every category of some types (refs: income,
+// expense, asset, liability), a tag total, or a calculation over other series (the Timeseries expression language). Each series has a
 // label and an axis: left, right, or virtual (its own scale over the chart's height, no axis drawn); the chart may
 // title its axes (leftLabel, rightLabel). Calculated by the API: per bucket (daily, weekly, monthly, quarterly,
 // yearly), the series' measure, separately for actuals (analysis) and for a forecast.
@@ -35,9 +37,11 @@ export function validateChart(chart) {
       if (expressionReferences(tree).aggregated.length) throw new HttpError(400, "ERR-CHART", `${name}: chart formulas use series values, not aggregates`);
       clean.expression = String(item.expression);
     } else {
-      if (item.type === "accounts") {
+      if (["accounts", "categories", "categoryTypes"].includes(item.type)) {
         clean.refs = [...new Set((Array.isArray(item.refs) ? item.refs : []).map(String).filter(Boolean))];
-        if (!clean.refs.length) throw new HttpError(400, "ERR-CHART", `${name}: refs (the accounts to add up) are required`);
+        const what = { accounts: "the accounts", categories: "the categories", categoryTypes: "the category types" }[item.type];
+        if (!clean.refs.length) throw new HttpError(400, "ERR-CHART", `${name}: refs (${what} to add up) are required`);
+        if (item.type === "categoryTypes" && clean.refs.some((ref) => !CATEGORY_TYPES.includes(ref))) throw new HttpError(400, "ERR-CHART", `${name}: category types are ${CATEGORY_TYPES.join(", ")}`);
       } else {
         if (!item.ref) throw new HttpError(400, "ERR-CHART", `${name}: ref (the account, category or tag) is required`);
         clean.ref = String(item.ref);
@@ -57,7 +61,7 @@ export function validateChart(chart) {
 }
 
 export default function createChartService({ workspaceService, projectService, resultsService, forecastService }) {
-  function accountsFor(tenant, project, series, accounts) {
+  function accountsFor(tenant, project, series, accounts, categories = []) {
     const find = (ref) => {
       const account = accounts.find((item) => item.shortCode === ref || item.id === ref);
       if (!account) throw new HttpError(400, "ERR-CHART", `${series.name}: account ${ref} was not found`);
@@ -66,12 +70,18 @@ export default function createChartService({ workspaceService, projectService, r
     if (series.type === "account") return [find(series.ref)];
     if (series.type === "accounts") return [...new Set(series.refs.map(find))];
     if (series.type === "category") return accounts.filter((item) => item.category === series.ref).map((item) => item.id);
+    if (series.type === "categories") return accounts.filter((item) => series.refs.includes(item.category)).map((item) => item.id);
+    if (series.type === "categoryTypes") {
+      const wanted = new Set(categories.filter((category) => series.refs.includes(category.type)).map((category) => category.id));
+      return accounts.filter((item) => wanted.has(item.category)).map((item) => item.id);
+    }
     return accounts.filter((item) => (item.tags || []).includes(series.ref)).map((item) => item.id);
   }
 
   async function data(tenant, project, input) {
     const chart = validateChart(input);
     const accounts = await projectService.accounts.list(tenant, project);
+    const { categories } = await workspaceService.get(tenant, "project", project);
     const scopes = [];
     if (chart.includeActuals || !chart.forecast) scopes.push({ kind: "actual", scope: "analysis" });
     if (chart.forecast) { await forecastService.get(tenant, project, chart.forecast); scopes.push({ kind: "forecast", scope: forecastService.scope(chart.forecast) }); }
@@ -93,7 +103,7 @@ export default function createChartService({ workspaceService, projectService, r
     const currencyOf = await projectService.accounts.currencies(tenant, project);
     const currencies = {};
     for (const series of chart.series.filter((item) => item.type !== "calculate")) {
-      const ids = accountsFor(tenant, project, series, accounts);
+      const ids = accountsFor(tenant, project, series, accounts, categories);
       const codes = [...new Set(ids.map(currencyOf))];
       currencies[series.name] = codes.length === 1 ? codes[0] : null;
       bySeries[series.name] = {};
@@ -141,6 +151,7 @@ export default function createChartService({ workspaceService, projectService, r
   async function transactions(tenant, project, input, paging = {}) {
     const chart = validateChart(input);
     const accounts = await projectService.accounts.list(tenant, project);
+    const { categories } = await workspaceService.get(tenant, "project", project);
     const names = new Map(accounts.map((account) => [account.id, account.name]));
     const currencyOf = await projectService.accounts.currencies(tenant, project);
     const byName = new Map(chart.series.map((item) => [item.name, item]));
@@ -159,7 +170,7 @@ export default function createChartService({ workspaceService, projectService, r
     const index = new Map();
     const list = [];
     for (const series of wanted) {
-      for (const id of accountsFor(tenant, project, series, accounts)) {
+      for (const id of accountsFor(tenant, project, series, accounts, categories)) {
         for (const { kind, scope } of scopes) {
           const key = `${scope}|${id}`;
           if (!cache.has(key)) cache.set(key, await resultsService.all(tenant, project, scope, id));

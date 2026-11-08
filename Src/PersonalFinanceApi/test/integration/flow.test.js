@@ -355,3 +355,35 @@ test("currencies: projects and accounts have one (the project's by default) and 
   const behind = await api.call("POST", `${P}/chart-transactions`, { chart });
   assert.deepEqual(behind.body.items.map((tx) => [tx.description, tx.currency]).sort(), [["Amazon", "USD"], ["Cafe", "NZD"]]);
 });
+
+test("chart series: several categories, or every category of some types (e.g. all assets)", async (t) => {
+  const api = await startTestApi();
+  t.after(() => api.close());
+  const tenant = (await api.call("GET", "/v1/me")).body.tenants[0].id;
+  const T = `/v1/tenants/${tenant}`;
+  const ds = (await api.call("POST", `${T}/datasources`, { name: "Bank" })).body;
+  const add = (date, description, amount) => api.call("POST", `${T}/datasources/${ds.id}/manual-transactions`, { date, account: "A", description, amount });
+  await add("2026-03-02", "Fuel", -60); await add("2026-03-03", "Food", -40); await add("2026-03-04", "Shares", 1000); await add("2026-03-05", "House", 5000); await add("2026-03-06", "Loan", -3000);
+  const project = (await api.call("POST", `${T}/projects`, { name: "Home", datasources: [ds.id] })).body;
+  const P = `${T}/projects/${project.id}`;
+  await api.call("POST", `${P}/categories`, { name: "Investments", type: "asset" });
+  await api.call("POST", `${P}/categories`, { name: "Property", type: "asset" });
+  await api.call("POST", `${P}/categories`, { name: "Debt", type: "liability" });
+  for (const [name, category] of [["Fuel", "transport"], ["Food", "food"], ["Shares", "investments"], ["House", "property"], ["Loan", "debt"]]) {
+    const account = (await api.call("POST", `${P}/accounts`, { name, category })).body;
+    await api.call("POST", `${P}/rules`, { name, account: account.id, conditions: [{ field: "description", op: "exact", value: name }] });
+  }
+  await api.call("POST", `${P}/analysis`);
+  await api.drain();
+  const chart = { name: "Net worth", bucket: "monthly", series: [{ name: "SPEND", type: "categories", refs: ["transport", "food"], measure: "sum" }, { name: "ASSETS", type: "categoryTypes", refs: ["asset"], measure: "running" }, { name: "NET", type: "categoryTypes", refs: ["asset", "liability"], measure: "running" }] };
+  const data = await api.call("POST", `${P}/chart-data`, { chart });
+  assert.equal(data.status, 200, JSON.stringify(data.body));
+  assert.deepEqual(data.body.series.map((series) => [series.name, series.actual[0]]), [["SPEND", -100], ["ASSETS", 6000], ["NET", 3000]]);
+  const behind = await api.call("POST", `${P}/chart-transactions`, { chart, series: "ASSETS" });
+  assert.deepEqual(behind.body.items.map((tx) => tx.description).sort(), ["House", "Shares"]);
+  assert.equal((await api.call("POST", `${P}/chart-data`, { chart: { ...chart, series: [{ name: "X", type: "categoryTypes", refs: ["savings"] }] } })).status, 400);
+  // Deleting a category repoints the several-categories series that used it.
+  await api.call("POST", `${P}/charts`, chart);
+  await api.call("DELETE", `${P}/categories/transport?moveTo=other`);
+  assert.deepEqual((await api.call("GET", `${P}/charts/net-worth`)).body.series[0].refs, ["other", "food"]);
+});

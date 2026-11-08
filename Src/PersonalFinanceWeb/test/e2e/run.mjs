@@ -196,7 +196,22 @@ try {
   await spending.getByLabel("Series axis").selectOption("right");
   await spending.getByLabel("Groceries").check();
   await spending.getByLabel("Rent payments").check();
+  // By category type: every expense account; the editor lists the accounts it adds up.
+  await editor.getByRole("button", { name: "Category type" }).click();
+  const byType = editor.locator(".card").filter({ hasText: "Category types to add up" });
+  await byType.getByLabel("Series label").fill("Expenses");
+  await byType.getByLabel("Expenses").check();
+  await byType.locator(".included").getByText(/Adds up \d+ accounts: .*Groceries/).waitFor();
+  // Several categories: Food and Home.
+  await editor.getByRole("button", { name: "Several categories" }).click();
+  const twoCategories = editor.locator(".card").filter({ hasText: "Categories to add up" });
+  await twoCategories.getByLabel("Series label").fill("Food and home");
+  await twoCategories.getByLabel("Food").check();
+  await twoCategories.getByLabel("Home").check();
+  await twoCategories.locator(".included").getByText(/Groceries, Rent payments|Rent payments, Groceries/).waitFor();
+  await shot("5-chart-editor");
   await editor.getByRole("button", { name: "Save chart" }).click();
+  await page.getByText("Food and home", { exact: true }).waitFor();
   await page.getByText("Spending (right)").waitFor();
   await page.locator("svg[role=img] path").first().waitFor();
   await shot("5-chart");

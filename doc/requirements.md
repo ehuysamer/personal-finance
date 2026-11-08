@@ -209,7 +209,9 @@ $tenants/{tenant}.json                      tenant and members
 ### Charts
 
 - [C] Named charts saved per project. A series is an account (by short code or id), **several accounts added up**
-      (any accounts, for groupings a category does not give), a category total, or a tag total; with a measure
+      (any accounts, for groupings a category does not give), a category total, **several categories added up**,
+      **every category of some types** (income, expense, asset, liability: e.g. all assets; the editor lists the
+      accounts it adds up), or a tag total; with a measure
       (running total, sum, count, average, min, max). Each series has a **label** and an **axis**: left, right (its
       own scale on the right), or virtual (its own scale over the chart's height, no axis drawn). Charts may title
       their left and right axes.
