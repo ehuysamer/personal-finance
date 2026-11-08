@@ -177,7 +177,9 @@ $tenants/{tenant}.json                      tenant and members
       (all must match).
 - [C] Text conditions on any field (`description`, `account`, `filename`, `datasource`): `wildcard` (`*` any run,
       `?` one character), `regex` (bounded input length and time), `exact`, `startswith`, `endswith`,
-      `containsall` and `containsany` (several entries), `not` flag, case-insensitive by default.
+      `containsall` and `containsany` (several entries), `not` flag. Each condition has an **Ignore case** tickbox
+      (ticked by default: "countdown" matches "COUNTDOWN ALBANY"); unticked, letter case must match
+      (`caseSensitive: true`), for every operator including wildcard and regex.
 - [C] Date range (optional start, optional end) and amount range (optional minimum, optional maximum).
 - [C] "Test rule" shows which transactions it would match (and which earlier rule takes them instead).
 - [C] A new rule's account is never pre-filled ("Choose an account"): the user picks it explicitly before saving. A

@@ -63,6 +63,10 @@ test("import, analyse, chart and forecast end to end", async (t) => {
   assert.equal(tested.body.count, 2);
   const noAccount = await api.call("POST", `${P}/rules-test`, { rule: { name: "coffee", conditions: [{ field: "description", op: "regex", value: "^coffee" }] } });
   assert.equal(noAccount.body.count, 2, "a rule can be tested before its account is chosen");
+  const ignoring = await api.call("POST", `${P}/rules-test`, { rule: { name: "c", conditions: [{ field: "description", op: "contains", value: "COFFEE" }] } });
+  const exact = await api.call("POST", `${P}/rules-test`, { rule: { name: "c", conditions: [{ field: "description", op: "contains", value: "COFFEE", caseSensitive: true }] } });
+  const exactRight = await api.call("POST", `${P}/rules-test`, { rule: { name: "c", conditions: [{ field: "description", op: "wildcard", value: "Coffee*", caseSensitive: true }] } });
+  assert.deepEqual([ignoring.body.count, exact.body.count, exactRight.body.count], [2, 0, 2], "case is ignored unless the condition asks for it");
   assert.equal((await api.call("POST", `${P}/rules`, { name: "coffee", conditions: [{ field: "description", op: "exact", value: "x" }] })).status, 400, "but not saved");
 
   const job = await api.call("POST", `${P}/analysis`);
