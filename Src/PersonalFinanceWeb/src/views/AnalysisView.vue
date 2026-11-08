@@ -63,6 +63,21 @@ function ruleFromTransaction(tx) {
 }
 
 const currencyOf = (id) => accounts.value.find((account) => account.id === id)?.currency || project.value?.currency || "NZD";
+// Rules by category, then account (in the project's order), each rule with its place in the order.
+const ruleView = ref("tree");
+const ruleTree = computed(() => {
+  const placed = rules.value.map((rule, i) => ({ ...rule, place: i + 1 }));
+  return accountsByCategory(accounts.value, project.value?.categories)
+    .map((group) => ({ category: group.category, accounts: group.accounts.map((account) => ({ account, rules: placed.filter((rule) => rule.account === account.id) })).filter((branch) => branch.rules.length) }))
+    .filter((group) => group.accounts.length)
+    .concat(orphanRules(placed));
+});
+// Rules whose account no longer exists are still shown (so they can be fixed or deleted).
+function orphanRules(placed) {
+  const known = new Set(accounts.value.map((account) => account.id));
+  const lost = placed.filter((rule) => !known.has(rule.account));
+  return lost.length ? [{ category: { id: "-missing", name: "Account deleted" }, accounts: [{ account: { id: "-missing", name: "(account deleted)" }, rules: lost }] }] : [];
+}
 const categoryOf = (id) => categoryName(accounts.value.find((account) => account.id === id), project.value?.categories);
 const accountName = (id) => accounts.value.find((account) => account.id === id)?.name || id;
 const accountSummary = computed(() => (status.value?.accounts || []).map((item) => ({ ...item, name: accountName(item.id) })).sort((a, b) => Math.abs(b.running) - Math.abs(a.running)));
@@ -122,13 +137,37 @@ async function moveRule(index, delta) {
     </div>
 
     <div v-if="tab === 'rules'">
-      <div class="spread"><p class="small muted">The first enabled rule that matches wins. Anything unmatched goes to Uncategorised.</p><button class="primary" @click="newRule"><Icon name="plus" /> Rule</button></div>
-      <ul class="list">
-        <li v-for="(rule, index) in rules" :key="rule.id">
-          <div class="grow link" @click="editRule(rule)"><div class="title">{{ rule.name }} <span v-if="!rule.enabled" class="badge">off</span></div><div class="sub">→ {{ accountName(rule.account) }} <span class="muted">({{ categoryOf(rule.account) }})</span></div></div>
-          <button class="icon ghost" :disabled="index === 0" aria-label="Move up" @click="moveRule(index, -1)"><Icon name="up" /></button>
-          <button class="icon ghost" :disabled="index === rules.length - 1" aria-label="Move down" @click="moveRule(index, 1)"><Icon name="down" /></button>
-          <button class="icon ghost" aria-label="Clone" @click="cloneRule(rule)"><Icon name="copy" /></button>
+      <div class="spread"><p class="small muted">The first enabled rule that matches wins (the number is its place). Anything unmatched goes to Uncategorised.</p><button class="primary" @click="newRule"><Icon name="plus" /> Rule</button></div>
+      <div class="tabs" role="tablist" aria-label="Rules view">
+        <button role="tab" :aria-selected="ruleView === 'tree'" :class="{ on: ruleView === 'tree' }" @click="ruleView = 'tree'">By account</button>
+        <button role="tab" :aria-selected="ruleView === 'order'" :class="{ on: ruleView === 'order' }" @click="ruleView = 'order'">In order</button>
+      </div>
+      <!-- Category, then account, then the rules that move transactions there. -->
+      <template v-if="ruleView === 'tree'">
+        <section v-for="group in ruleTree" :key="group.category.id" class="rule-category">
+          <h3>{{ group.category.name }}</h3>
+          <div v-for="branch in group.accounts" :key="branch.account.id" class="rule-account">
+            <h4>{{ branch.account.name }} <span class="muted small">{{ branch.rules.length }} {{ branch.rules.length === 1 ? "rule" : "rules" }}</span></h4>
+            <ul class="list">
+              <li v-for="rule in branch.rules" :key="rule.id" class="link rule-row" role="button" tabindex="0" :aria-label="`Edit rule ${rule.name}`" @click="editRule(rule)" @keyup.enter="editRule(rule)">
+                <span class="badge" :title="`Rule ${rule.place} of ${rules.length}`">{{ rule.place }}</span>
+                <div class="grow"><div class="title">{{ rule.name }} <span v-if="!rule.enabled" class="badge">off</span></div></div>
+                <button class="icon ghost" aria-label="Clone" title="Clone" @click.stop="cloneRule(rule)"><Icon name="copy" /></button>
+                <Icon name="chevron" />
+              </li>
+            </ul>
+          </div>
+        </section>
+        <ul v-if="!rules.length" class="list"><li class="empty">No rules yet</li></ul>
+      </template>
+      <!-- The order rules are tried in: move one up or down to change which wins. -->
+      <ul v-else class="list">
+        <li v-for="(rule, index) in rules" :key="rule.id" class="link rule-row" role="button" tabindex="0" :aria-label="`Edit rule ${rule.name}`" @click="editRule(rule)" @keyup.enter="editRule(rule)">
+          <span class="badge">{{ index + 1 }}</span>
+          <div class="grow"><div class="title">{{ rule.name }} <span v-if="!rule.enabled" class="badge">off</span></div><div class="sub">→ {{ accountName(rule.account) }} <span class="muted">({{ categoryOf(rule.account) }})</span></div></div>
+          <button class="icon ghost" :disabled="index === 0" aria-label="Move up" @click.stop="moveRule(index, -1)"><Icon name="up" /></button>
+          <button class="icon ghost" :disabled="index === rules.length - 1" aria-label="Move down" @click.stop="moveRule(index, 1)"><Icon name="down" /></button>
+          <button class="icon ghost" aria-label="Clone" @click.stop="cloneRule(rule)"><Icon name="copy" /></button>
         </li>
         <li v-if="!rules.length" class="empty">No rules yet</li>
       </ul>

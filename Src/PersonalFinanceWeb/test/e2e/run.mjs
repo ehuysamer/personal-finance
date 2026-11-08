@@ -120,8 +120,16 @@ try {
     await page.getByRole("button", { name: "Test" }).click();
     await page.getByText(/transactions match/).waitFor();
     await page.getByRole("button", { name: "Save" }).click();
-    await page.getByText(`→ ${account}`).waitFor();
+    await page.locator(".rule-account h4", { hasText: account }).waitFor();
   }
+  // Rules are grouped by category and account; a row opens its rule; In order shows the order they are tried in.
+  await page.locator(".rule-category", { hasText: "Food" }).locator(".rule-account", { hasText: "Groceries" }).getByText("Supermarkets").waitFor();
+  await page.getByRole("button", { name: "Edit rule Supermarkets" }).click();
+  await page.getByRole("dialog", { name: "Edit rule" }).getByLabel("Close").click();
+  await page.getByRole("tab", { name: "In order" }).click();
+  await page.locator("li.rule-row").first().locator(".title", { hasText: "Salary" }).waitFor();
+  await page.getByRole("tab", { name: "By account" }).click();
+  await shot("3b-rules");
   await page.getByRole("button", { name: "Overview" }).click();
   await page.getByRole("button", { name: "Analyse" }).click();
   await page.getByText("Last analysed").waitFor({ timeout: 20000 });

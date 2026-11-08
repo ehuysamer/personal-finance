@@ -137,3 +137,11 @@ button.aggregate-row .title { flex: 0 0 auto; min-width: 84px; font-weight: 550;
   .list > li.tx:not(:has(.tx-actions)) { grid-template-areas: "date amount" "body body"; }
 }
 td .weekday { color: var(--muted); font-size: .75rem; }
+/* Clickable rows look clickable: pointer, hover and focus highlight. */
+.link { cursor: pointer; }
+.list > li.link:hover, .list > li.link:focus-visible { background: var(--surface-2); outline: none; }
+.list > li.rule-row .badge { min-width: 28px; text-align: center; }
+.rule-category h3 { margin: 16px 0 4px; }
+.rule-account { margin: 0 0 10px 12px; }
+.rule-account h4 { margin: 8px 0 4px; font-size: .9rem; }
+.rule-account h4 .muted { font-weight: 400; }
