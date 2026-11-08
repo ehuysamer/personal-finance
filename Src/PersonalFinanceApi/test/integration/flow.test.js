@@ -278,3 +278,43 @@ test("after analysis, unmatched transactions come with a suggested rule that mat
   const tested = await api.call("POST", `${P}/rules-test`, { rule: { ...rule, account: food.id } });
   assert.equal(tested.body.count, 1, "the suggestion matches the transaction it came from");
 });
+
+test("charts: several accounts in one series, axes, daily and weekly buckets, and the transactions behind a bucket", async (t) => {
+  const api = await startTestApi();
+  t.after(() => api.close());
+  const tenant = (await api.call("GET", "/v1/me")).body.tenants[0].id;
+  const T = `/v1/tenants/${tenant}`;
+  const ds = (await api.call("POST", `${T}/datasources`, { name: "Bank" })).body;
+  const add = (date, description, amount) => api.call("POST", `${T}/datasources/${ds.id}/manual-transactions`, { date, account: "A", description, amount });
+  await add("2026-03-02", "Fuel", -60); await add("2026-03-03", "Insurance", -40); await add("2026-03-10", "Fuel", -50); await add("2026-04-01", "Salary", 1000);
+  const project = (await api.call("POST", `${T}/projects`, { name: "Home", datasources: [ds.id] })).body;
+  const P = `${T}/projects/${project.id}`;
+  for (const [name, category, code] of [["Fuel", "transport", "FUEL"], ["Insurance", "transport", "INS"], ["Salary", "income", "INC"]]) {
+    const account = (await api.call("POST", `${P}/accounts`, { name, category, shortCode: code })).body;
+    await api.call("POST", `${P}/rules`, { name, account: account.id, conditions: [{ field: "description", op: "exact", value: name }] });
+  }
+  await api.call("POST", `${P}/analysis`);
+  await api.drain();
+  const chart = { name: "Car", bucket: "weekly", leftLabel: "Spending", rightLabel: "Income", series: [{ name: "CAR", label: "Car", type: "accounts", refs: ["FUEL", "INS"], measure: "sum" }, { name: "INC", type: "account", ref: "INC", measure: "sum", axis: "right" }, { name: "N", type: "calculate", expression: "CAR * 2", axis: "virtual" }] };
+  const weekly = await api.call("POST", `${P}/chart-data`, { chart });
+  assert.equal(weekly.status, 200, JSON.stringify(weekly.body));
+  assert.deepEqual(weekly.body.buckets, ["2026-03-02", "2026-03-09", "2026-03-30"]);
+  const car = weekly.body.series.find((series) => series.name === "CAR");
+  assert.deepEqual([car.label, car.actual], ["Car", [-100, -50, null]]);
+  assert.deepEqual(weekly.body.series.map((series) => series.axis), ["left", "right", "virtual"]);
+  assert.deepEqual([weekly.body.leftLabel, weekly.body.rightLabel], ["Spending", "Income"]);
+  const daily = await api.call("POST", `${P}/chart-data`, { chart, bucket: "daily" });
+  assert.deepEqual(daily.body.buckets, ["2026-03-02", "2026-03-03", "2026-03-10", "2026-04-01"]);
+  const monthly = await api.call("POST", `${P}/chart-data`, { chart, bucket: "monthly" });
+  assert.deepEqual(monthly.body.series.find((series) => series.name === "CAR").actual, [-150, null]);
+  const behind = await api.call("POST", `${P}/chart-transactions`, { chart, period: "2026-03-02" });
+  assert.deepEqual(behind.body.items.map((tx) => [tx.description, tx.seriesLabel, tx.accountName]).sort(), [["Fuel", "Car", "Fuel"], ["Insurance", "Car", "Insurance"]]);
+  const viaFormula = await api.call("POST", `${P}/chart-transactions`, { chart, series: "N" });
+  assert.equal(viaFormula.body.total, 3, "a formula stands for the series it uses");
+  const twice = await api.call("POST", `${P}/chart-transactions`, { chart: { ...chart, series: [...chart.series, { name: "F", label: "Fuel only", type: "account", ref: "FUEL" }] }, period: "2026-03-02" });
+  assert.deepEqual(twice.body.items.map((tx) => [tx.description, tx.seriesLabel]).sort(), [["Fuel", "Car, Fuel only"], ["Insurance", "Car"]], "listed once, with every series it is in");
+  const all = await api.call("POST", `${P}/chart-transactions`, { chart, pageSize: 2 });
+  assert.deepEqual([all.body.total, all.body.pages, all.body.items[0].description], [4, 2, "Salary"]);
+  assert.equal((await api.call("POST", `${P}/chart-data`, { chart: { ...chart, series: [{ name: "X", type: "accounts", refs: [] }] } })).status, 400);
+  assert.equal((await api.call("POST", `${P}/chart-data`, { chart: { ...chart, series: [{ name: "X", type: "account", ref: "INC", axis: "top" }] } })).status, 400);
+});

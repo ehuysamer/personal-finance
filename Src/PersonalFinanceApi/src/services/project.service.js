@@ -50,7 +50,7 @@ export default function createProjectService({ store, indexService, workspaceSer
     const usedBy = { rules: [], charts: [] };
     for (const rule of await rules.list(keys.rules(tenant, projectId))) if (rule.account === accountId) usedBy.rules.push(rule.id);
     const account = await accounts.get(keys.accounts(tenant, projectId), accountId);
-    for (const chart of await charts.all(keys.charts(tenant, projectId))) if ((chart.series || []).some((series) => series.type === "account" && (series.ref === accountId || series.ref === account.shortCode))) usedBy.charts.push(chart.id);
+    for (const chart of await charts.all(keys.charts(tenant, projectId))) if ((chart.series || []).some((series) => [series.ref, ...(series.type === "accounts" ? series.refs || [] : [])].some((ref) => ["account", "accounts"].includes(series.type) && (ref === accountId || ref === account.shortCode)))) usedBy.charts.push(chart.id);
     return usedBy;
   }
 

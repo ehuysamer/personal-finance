@@ -4,7 +4,7 @@ import { projectPath, state, toast } from "../state.js";
 import { formatDate, formatMoney } from "../lib/format.js";
 import Icon from "../components/Icon.vue";
 import Sheet from "../components/Sheet.vue";
-import ChartPanel from "../components/ChartPanel.vue";
+import Explore from "../components/Explore.vue";
 import JobProgress from "../components/JobProgress.vue";
 import TransactionList from "../components/TransactionList.vue";
 import NewAccountForm from "../components/NewAccountForm.vue";
@@ -30,7 +30,6 @@ async function load() {
     project.value = p; accounts.value = a.items; rules.value = r.items; status.value = s;
     const running = jobs.items.find((job) => job.type === "analysis" && ["queued", "running"].includes(job.status));
     if (running) jobId.value = running.id;
-    if (!historyAccount.value && accounts.value.length) historyAccount.value = accounts.value[0].id;
   } catch (failure) { error.value = failure.message; }
 }
 onMounted(load);
@@ -94,7 +93,7 @@ async function moveRule(index, delta) {
     <h1>Analysis</h1>
     <p v-if="error" class="error">{{ error }}</p>
     <div class="tabs" role="tablist">
-      <button v-for="item in [['run', 'Overview'], ['rules', 'Rules'], ['charts', 'Charts'], ['history', 'History']]" :key="item[0]" :class="{ on: tab === item[0] }" @click="tab = item[0]">{{ item[1] }}</button>
+      <button v-for="item in [['run', 'Overview'], ['rules', 'Rules'], ['explore', 'Explore']]" :key="item[0]" :class="{ on: tab === item[0] }" @click="tab = item[0]">{{ item[1] }}</button>
     </div>
 
     <div v-if="tab === 'run'">
@@ -106,7 +105,7 @@ async function moveRule(index, delta) {
       <p v-if="status?.finishedAt" class="small muted">Last analysed {{ new Date(status.finishedAt).toLocaleString() }} · transactions up to {{ formatDate(status.lastDate) }}</p>
       <p v-for="warning in status?.warnings || []" :key="warning" class="small neg">{{ warning }}</p>
       <ul class="list">
-        <li v-for="item in accountSummary" :key="item.id" class="link" @click="historyAccount = item.id; tab = 'history'">
+        <li v-for="item in accountSummary" :key="item.id" class="link" @click="historyAccount = item.id; tab = 'explore'">
           <div class="grow"><div class="title">{{ item.name }}</div><div class="sub">{{ item.count }} transactions<template v-if="item.first"> · {{ formatDate(item.first) }} – {{ formatDate(item.last) }}</template></div></div>
           <div class="num" :class="{ neg: item.running < 0 }">{{ formatMoney(item.running) }}</div>
         </li>
@@ -132,14 +131,8 @@ async function moveRule(index, delta) {
       </ul>
     </div>
 
-    <div v-if="tab === 'charts' && project">
-      <ChartPanel :accounts="accounts" :categories="project.categories" />
-    </div>
-
-    <div v-if="tab === 'history'">
-      <select v-model="historyAccount" aria-label="Account" style="margin-bottom: 8px"><option v-for="account in accounts" :key="account.id" :value="account.id">{{ account.name }}</option></select>
-      <TransactionList v-if="historyAccount" :path="`${projectPath()}/accounts/${historyAccount}/transactions`" />
-    </div>
+    <!-- Charts, history and aggregates in one place; an account picked on the Overview opens here. -->
+    <Explore v-if="tab === 'explore' && project" :key="historyAccount || 'explore'" :accounts="accounts" :categories="project.categories" :initial-account="historyAccount" />
 
     <Sheet v-if="ruleDraft" :title="ruleDraft.id ? 'Edit rule' : 'New rule'" @close="ruleDraft = null">
       <div class="grid2">

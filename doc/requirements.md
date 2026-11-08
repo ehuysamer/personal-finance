@@ -201,11 +201,29 @@ $tenants/{tenant}.json                      tenant and members
 
 ### Charts
 
-- [C] Named charts saved per project. Series: an account (by short code), a category total, or a tag total; a measure
-      (running total, sum, count, average, min, max); a bucket (month, quarter, year).
+- [C] Named charts saved per project. A series is an account (by short code or id), **several accounts added up**
+      (any accounts, for groupings a category does not give), a category total, or a tag total; with a measure
+      (running total, sum, count, average, min, max). Each series has a **label** and an **axis**: left, right (its
+      own scale on the right), or virtual (its own scale over the chart's height, no axis drawn). Charts may title
+      their left and right axes.
+- [C] Periods: daily, weekly (ISO weeks, named by their Monday), monthly, quarterly, yearly. Monthly, quarterly and
+      yearly come from the stored aggregates; daily and weekly are worked out from the transactions.
 - [C] Calculated series with the Timeseries expression language (`chartExpression.js`: series names, numbers,
       `+ - * /`, parentheses, per-bucket aggregates), e.g. `INC - EXP`, `SAV / INC * 100`.
 - [C] Charts are calculated by the API, never in the browser (as Timeseries).
+
+### Explore (charts, history and aggregates in one place)
+
+- [C] Analysis and Forecast each have one **Explore** tab instead of separate Charts and History. Its settings at the
+      top choose what to look at (a saved chart, or any one account: its running total and its total per period),
+      the period (day to year) and an optional date range (and, in a forecast, whether actuals are included). The
+      user then flips between:
+  - **Chart**: the lines (actuals solid, forecast dotted).
+  - **History**: the transactions behind the chart, paged, newest first, searchable, each with its series (a
+    transaction in several series is listed once, with all of them) and account.
+  - **Aggregates**: a row per period (newest first) with every series' value; a row's dropdown shows the
+    transactions that made it. A formula series stands for the series it uses.
+- [C] MCP: `chart_data` (with bucket, start, end overrides), `chart_transactions` (all, one period, or one series).
 
 ### Account history
 

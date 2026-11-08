@@ -153,15 +153,34 @@ try {
   await page.getByRole("button", { name: "Analyse again" }).click();
   await page.getByRole("heading", { name: /Not matched by any rule 0/ }).waitFor({ timeout: 20000 });
   await shot("4-analysis");
-  await page.getByRole("button", { name: "Charts" }).click();
+  // Explore: a chart with salary on the left and spending (several accounts added up) on the right; then its
+  // history, its aggregates (a month opens to its transactions), and one account.
+  await page.getByRole("button", { name: "Explore" }).click();
   await page.getByRole("button", { name: "New chart" }).click();
-  await page.getByPlaceholder("Income and spending").fill("Salary");
-  await page.getByRole("button", { name: "Save chart" }).click();
+  const editor = page.getByRole("dialog", { name: "New chart" });
+  await editor.getByPlaceholder("Income and spending").fill("Income and spending");
+  await editor.getByLabel("Series account").first().selectOption({ label: "Salary (INC)" });
+  await editor.getByLabel("Series label").first().fill("Salary");
+  await editor.getByRole("button", { name: "Several accounts" }).click();
+  const spending = editor.locator(".card").filter({ hasText: "Accounts to add up" });
+  await spending.getByLabel("Series label").fill("Spending");
+  await spending.getByLabel("Series axis").selectOption("right");
+  await spending.getByLabel("Groceries").check();
+  await spending.getByLabel("Rent payments").check();
+  await editor.getByRole("button", { name: "Save chart" }).click();
+  await page.getByText("Spending (right)").waitFor();
   await page.locator("svg[role=img] path").first().waitFor();
   await shot("5-chart");
-  await page.getByRole("button", { name: "History" }).click();
-  await page.getByLabel("Account").selectOption({ label: "Groceries" });
+  await page.getByRole("tab", { name: "History" }).click();
   await page.getByText("New World").waitFor();
+  await shot("5a-history");
+  await page.getByRole("tab", { name: "Aggregates" }).click();
+  await page.getByRole("button", { name: "2026-02 transactions" }).click();
+  await page.locator(".behind").getByText("New World").waitFor();
+  await shot("5b-aggregates");
+  await page.getByLabel("Show").selectOption({ label: "Groceries" });
+  await page.getByRole("tab", { name: "History" }).click();
+  await page.getByText("Countdown Albany").first().waitFor();
 
   // Forecast: create, run, see transactions with actuals greyed and the chart with a dotted forecast.
   await page.getByRole("link", { name: "Forecast" }).click();
@@ -171,14 +190,15 @@ try {
   await page.getByRole("heading", { name: "Base case" }).waitFor();
   await page.getByRole("button", { name: "Run" }).click();
   await page.getByText("Last run").waitFor({ timeout: 20000 });
-  await page.getByRole("button", { name: "Transactions" }).click();
-  await page.getByLabel("Account").selectOption({ label: "Salary" });
+  await page.getByRole("button", { name: "Explore" }).click();
+  await page.getByLabel("Show").selectOption({ label: "Salary" });
+  await page.getByRole("tab", { name: "History" }).click();
   await page.getByText("replayed (monthly)").first().waitFor();
   // Newest first, the actuals are on the last page; oldest first they lead.
   await page.getByLabel("Order").selectOption("asc");
   await page.locator("li.actual").first().waitFor();
   await shot("6-forecast-transactions");
-  await page.getByRole("button", { name: "Charts" }).click();
+  await page.getByRole("tab", { name: "Chart" }).click();
   await page.locator("svg[role=img] path[stroke-dasharray]").first().waitFor();
   await shot("7-forecast-chart");
   await page.getByRole("button", { name: "Model" }).click();

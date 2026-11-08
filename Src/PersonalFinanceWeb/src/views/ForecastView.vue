@@ -4,9 +4,8 @@ import { go, projectPath, state, toast } from "../state.js";
 import { describeFrequency, formatDate, formatMoney, formatPercent, isFrequency } from "../lib/format.js";
 import Icon from "../components/Icon.vue";
 import Sheet from "../components/Sheet.vue";
-import ChartPanel from "../components/ChartPanel.vue";
+import Explore from "../components/Explore.vue";
 import JobProgress from "../components/JobProgress.vue";
-import TransactionList from "../components/TransactionList.vue";
 
 const api = inject("api");
 const METHODS = [["replay+trend", "Replay recurring + trend (default)"], ["trend", "Trend only"], ["average", "Average month"], ["last", "Last month"], ["fixed", "Fixed amount per month"], ["none", "Nothing"]];
@@ -21,13 +20,10 @@ const tab = ref("overview");
 const draft = ref(null);
 const jobId = ref(null);
 const error = ref("");
-const historyAccount = ref(null);
-const includeActuals = ref(true);
 
 async function loadList() {
   const [list, p, a] = await Promise.all([api.get(`${projectPath()}/forecasts`), api.get(projectPath()), api.get(`${projectPath()}/accounts`)]);
   forecasts.value = list.items; project.value = p; accounts.value = a.items;
-  if (!historyAccount.value && accounts.value.length) historyAccount.value = accounts.value[0].id;
 }
 async function loadCurrent() {
   error.value = ""; definition.value = null; results.value = null;
@@ -112,7 +108,7 @@ const models = computed(() => Object.entries(results.value?.model?.accounts || {
     <p class="small muted">{{ describeFrequency(definition.frequency) }} · {{ horizonText(definition.horizon) }} · lookback {{ definition.lookbackYears }} years<template v-if="definition.generators.length"> · {{ definition.generators.length }} generators</template></p>
     <p v-if="error" class="error">{{ error }}</p>
     <div class="tabs" role="tablist">
-      <button v-for="item in [['overview', 'Overview'], ['charts', 'Charts'], ['history', 'Transactions'], ['model', 'Model']]" :key="item[0]" :class="{ on: tab === item[0] }" @click="tab = item[0]">{{ item[1] }}</button>
+      <button v-for="item in [['overview', 'Overview'], ['explore', 'Explore'], ['model', 'Model']]" :key="item[0]" :class="{ on: tab === item[0] }" @click="tab = item[0]">{{ item[1] }}</button>
     </div>
 
     <div v-if="tab === 'overview'">
@@ -123,13 +119,7 @@ const models = computed(() => Object.entries(results.value?.model?.accounts || {
       <JobProgress v-if="jobId" :job-id="jobId" @done="done" />
     </div>
 
-    <div v-if="tab === 'charts' && project"><ChartPanel :forecast="current" :accounts="accounts" :categories="project.categories" /></div>
-
-    <div v-if="tab === 'history'">
-      <select v-model="historyAccount" aria-label="Account"><option v-for="account in accounts" :key="account.id" :value="account.id">{{ account.name }}</option></select>
-      <label class="check small"><input v-model="includeActuals" type="checkbox" />Include actuals (greyed)</label>
-      <TransactionList v-if="historyAccount" :path="`${projectPath()}/accounts/${historyAccount}/transactions`" :params="{ forecast: current, includeActuals }" :grey-actuals="includeActuals" />
-    </div>
+    <Explore v-if="tab === 'explore' && project" :key="current" :forecast="current" :accounts="accounts" :categories="project.categories" />
 
     <div v-if="tab === 'model'">
       <p class="small muted">What the forecast found per account at its last run: base (real money per month, today's prices), growth after inflation, recurring transactions it replays.</p>

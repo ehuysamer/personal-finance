@@ -1,7 +1,19 @@
+// Stored with every analysis and forecast run.
 export const BUCKETS = ["monthly", "quarterly", "yearly"];
+// Charts and aggregates can also go by day or week (worked out from the transactions).
+export const CHART_BUCKETS = ["daily", "weekly", ...BUCKETS];
 export const MEASURES = ["sum", "running", "count", "avg", "min", "max"];
 
+// A week is named by its Monday (ISO weeks).
+function mondayOf(date) {
+  const day = new Date(`${date}T00:00:00Z`);
+  day.setUTCDate(day.getUTCDate() - ((day.getUTCDay() + 6) % 7));
+  return day.toISOString().slice(0, 10);
+}
+
 export function periodOf(date, bucket) {
+  if (bucket === "daily") return date.slice(0, 10);
+  if (bucket === "weekly") return mondayOf(date);
   const year = date.slice(0, 4);
   if (bucket === "yearly") return year;
   const month = Number(date.slice(5, 7));
@@ -60,4 +72,23 @@ export function combineAggregates(list, bucket) {
     out.avg = out.count ? round(out.sum / out.count) : null;
     return out;
   });
+}
+
+// One bucket's entries (as aggregate) from transactions in date order, for the buckets not stored (daily, weekly).
+export function aggregateFor(transactions, bucket, opening = 0) {
+  const entries = [];
+  let current = null;
+  let running = opening;
+  for (const tx of transactions) {
+    running = round(running + tx.amount);
+    const period = periodOf(tx.date, bucket);
+    if (!current || current.period !== period) { current = { period, sum: 0, count: 0, min: tx.amount, max: tx.amount, running }; entries.push(current); }
+    current.sum = round(current.sum + tx.amount);
+    current.count += 1;
+    current.min = Math.min(current.min, tx.amount);
+    current.max = Math.max(current.max, tx.amount);
+    current.running = running;
+    current.avg = round(current.sum / current.count);
+  }
+  return entries;
 }

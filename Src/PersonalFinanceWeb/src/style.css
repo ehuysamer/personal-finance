@@ -116,3 +116,9 @@ button.sign.negate { color: var(--danger); border-color: var(--danger); backgrou
 .part > button.sign + select { flex: 0 0 100px; }
 .sample-grid { margin-top: 8px; max-height: 360px; overflow: auto; }
 .sample-grid td { max-width: 220px; overflow: hidden; text-overflow: ellipsis; }
+button.aggregate-row { display: flex; align-items: center; gap: 10px; width: 100%; text-align: left; padding: 6px 0; min-height: 44px; }
+button.aggregate-row .title { flex: 0 0 auto; min-width: 84px; font-weight: 550; }
+.aggregate-values { flex: 1; display: flex; flex-direction: column; align-items: flex-end; gap: 2px; }
+.behind { margin: 4px 0 6px; }
+.behind .list { box-shadow: none; }
+.series-name { margin-right: 6px; }

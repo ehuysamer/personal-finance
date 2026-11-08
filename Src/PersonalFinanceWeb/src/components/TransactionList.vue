@@ -4,7 +4,8 @@ import { formatDate, formatMoney } from "../lib/format.js";
 
 // A paged transaction list (newest first by default). path is the API route; params are added to every call.
 // Actual rows are greyed when a forecast is shown with its actuals.
-const props = defineProps({ path: { type: String, required: true }, params: { type: Object, default: () => ({}) }, showRunning: { type: Boolean, default: true }, greyActuals: { type: Boolean, default: false }, actionLabel: { type: String, default: "" } });
+const props = defineProps({ path: { type: String, required: true }, params: { type: Object, default: () => ({}) }, showRunning: { type: Boolean, default: true }, greyActuals: { type: Boolean, default: false }, actionLabel: { type: String, default: "" }, body: { type: Object, default: null } });
+// With body, the list is POSTed (body plus paging), e.g. a chart's transactions.
 // actionLabel adds a button to each row that emits action with the transaction (e.g. "Add rule").
 const emit = defineEmits(["action"]);
 const api = inject("api");
@@ -18,11 +19,12 @@ const loading = ref(false);
 
 async function load() {
   loading.value = true; error.value = "";
-  try { result.value = await api.get(props.path, { ...props.params, page: page.value, pageSize: 50, order: order.value, sort: sort.value, q: q.value }); }
+  const paging = { page: page.value, pageSize: 50, order: order.value, sort: sort.value, q: q.value };
+  try { result.value = props.body ? await api.post(props.path, { ...props.body, ...paging }) : await api.get(props.path, { ...props.params, ...paging }); }
   catch (failure) { error.value = failure.message; }
   loading.value = false;
 }
-watch(() => [props.path, JSON.stringify(props.params)], () => { page.value = 1; load(); }, { immediate: true });
+watch(() => [props.path, JSON.stringify(props.params), JSON.stringify(props.body)], () => { page.value = 1; load(); }, { immediate: true });
 let timer;
 function search() { clearTimeout(timer); timer = setTimeout(() => { page.value = 1; load(); }, 300); }
 function source(tx) {
@@ -44,7 +46,7 @@ function source(tx) {
       <li v-for="(tx, index) in result.items" :key="`${tx.date}-${index}-${tx.seq ?? ''}`" :class="{ actual: greyActuals && tx.kind === 'actual', stack: !!actionLabel }">
         <div class="grow">
           <div class="title">{{ tx.description || "(no description)" }}</div>
-          <div class="sub">{{ formatDate(tx.date) }}<template v-if="tx.bankAccount || tx.account"> · {{ tx.bankAccount || tx.account }}</template> · {{ source(tx) }}<template v-if="greyActuals"> · {{ tx.kind }}</template></div>
+          <div class="sub">{{ formatDate(tx.date) }}<template v-if="tx.seriesLabel"> · {{ tx.seriesLabel }}<template v-if="tx.accountName !== tx.seriesLabel"> ({{ tx.accountName }})</template></template><template v-else-if="tx.bankAccount || tx.account"> · {{ tx.bankAccount || tx.account }}</template> · {{ source(tx) }}<template v-if="greyActuals"> · {{ tx.kind }}</template></div>
         </div>
         <div class="num">
           <div :class="{ neg: tx.amount < 0 }">{{ formatMoney(tx.amount) }}</div>
