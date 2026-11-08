@@ -1,7 +1,7 @@
 <script setup>
 import { computed, inject, onMounted, ref } from "vue";
 import { projectPath, state, toast } from "../state.js";
-import { formatDate, formatMoney } from "../lib/format.js";
+import { accountsByCategory, categoryName, formatDate, formatMoney } from "../lib/format.js";
 import Icon from "../components/Icon.vue";
 import Sheet from "../components/Sheet.vue";
 import Explore from "../components/Explore.vue";
@@ -63,6 +63,7 @@ function ruleFromTransaction(tx) {
 }
 
 const currencyOf = (id) => accounts.value.find((account) => account.id === id)?.currency || project.value?.currency || "NZD";
+const categoryOf = (id) => categoryName(accounts.value.find((account) => account.id === id), project.value?.categories);
 const accountName = (id) => accounts.value.find((account) => account.id === id)?.name || id;
 const accountSummary = computed(() => (status.value?.accounts || []).map((item) => ({ ...item, name: accountName(item.id) })).sort((a, b) => Math.abs(b.running) - Math.abs(a.running)));
 
@@ -108,7 +109,7 @@ async function moveRule(index, delta) {
       <p v-for="warning in status?.warnings || []" :key="warning" class="small neg">{{ warning }}</p>
       <ul class="list">
         <li v-for="item in accountSummary" :key="item.id" class="link" @click="historyAccount = item.id; tab = 'explore'">
-          <div class="grow"><div class="title">{{ item.name }}</div><div class="sub">{{ item.count }} transactions<template v-if="item.first"> · {{ formatDate(item.first) }} – {{ formatDate(item.last) }}</template></div></div>
+          <div class="grow"><div class="title">{{ item.name }}</div><div class="sub">{{ categoryOf(item.id) }} · {{ item.count }} transactions<template v-if="item.first"> · {{ formatDate(item.first) }} – {{ formatDate(item.last) }}</template></div></div>
           <div class="num" :class="{ neg: item.running < 0 }">{{ formatMoney(item.running, currencyOf(item.id)) }}</div>
         </li>
         <li v-if="!accountSummary.length" class="empty">Not analysed yet</li>
@@ -124,7 +125,7 @@ async function moveRule(index, delta) {
       <div class="spread"><p class="small muted">The first enabled rule that matches wins. Anything unmatched goes to Uncategorised.</p><button class="primary" @click="newRule"><Icon name="plus" /> Rule</button></div>
       <ul class="list">
         <li v-for="(rule, index) in rules" :key="rule.id">
-          <div class="grow link" @click="editRule(rule)"><div class="title">{{ rule.name }} <span v-if="!rule.enabled" class="badge">off</span></div><div class="sub">→ {{ accountName(rule.account) }}</div></div>
+          <div class="grow link" @click="editRule(rule)"><div class="title">{{ rule.name }} <span v-if="!rule.enabled" class="badge">off</span></div><div class="sub">→ {{ accountName(rule.account) }} <span class="muted">({{ categoryOf(rule.account) }})</span></div></div>
           <button class="icon ghost" :disabled="index === 0" aria-label="Move up" @click="moveRule(index, -1)"><Icon name="up" /></button>
           <button class="icon ghost" :disabled="index === rules.length - 1" aria-label="Move down" @click="moveRule(index, 1)"><Icon name="down" /></button>
           <button class="icon ghost" aria-label="Clone" @click="cloneRule(rule)"><Icon name="copy" /></button>
@@ -142,7 +143,7 @@ async function moveRule(index, delta) {
         <div class="field">
           <span class="small muted" style="font-weight: 550">Into account</span>
           <div class="row" style="flex-wrap: nowrap">
-            <select v-model="ruleDraft.account" aria-label="Into account"><option value="" disabled>Choose an account</option><option v-for="account in accounts" :key="account.id" :value="account.id">{{ account.name }}</option></select>
+            <select v-model="ruleDraft.account" aria-label="Into account"><option value="" disabled>Choose an account</option><optgroup v-for="group in accountsByCategory(accounts, project?.categories)" :key="group.category.id" :label="group.category.name"><option v-for="account in group.accounts" :key="account.id" :value="account.id">{{ account.name }}</option></optgroup></select>
             <button class="icon" aria-label="Add an account" title="Add an account" @click="addingAccount = true"><Icon name="plus" /></button>
           </div>
         </div>

@@ -1,6 +1,7 @@
 <script setup>
 import { computed, inject, ref } from "vue";
 import { projectPath, toast } from "../state.js";
+import { accountsByCategory, categoryName } from "../lib/format.js";
 import Icon from "./Icon.vue";
 import Sheet from "./Sheet.vue";
 
@@ -60,7 +61,7 @@ async function remove() {
         <label class="field"><span>Name (used in formulas)</span><input v-model="series.name" aria-label="Series name" /></label>
         <label class="field"><span>Type</span><select v-model="series.type" aria-label="Series type" @change="series.type === 'accounts' && !series.refs ? (series.refs = series.ref ? [series.ref] : []) : null"><option value="account">Account</option><option value="accounts">Several accounts (added up)</option><option value="category">Category total</option><option value="tag">Tag total</option><option value="calculate">Formula</option></select></label>
         <label class="field"><span>Axis</span><select v-model="series.axis" aria-label="Series axis"><option v-for="axis in AXES" :key="axis[0]" :value="axis[0]">{{ axis[1] }}</option></select></label>
-        <label v-if="series.type === 'account'" class="field"><span>Account</span><select v-model="series.ref" aria-label="Series account"><option v-for="account in accounts" :key="account.id" :value="refOf(account)">{{ account.name }}{{ account.shortCode ? ` (${account.shortCode})` : "" }}</option></select></label>
+        <label v-if="series.type === 'account'" class="field"><span>Account</span><select v-model="series.ref" aria-label="Series account"><optgroup v-for="group in accountsByCategory(accounts, categories)" :key="group.category.id" :label="group.category.name"><option v-for="account in group.accounts" :key="account.id" :value="refOf(account)">{{ account.name }}{{ account.shortCode ? ` (${account.shortCode})` : "" }}</option></optgroup></select></label>
         <label v-if="series.type === 'category'" class="field"><span>Category</span><select v-model="series.ref"><option v-for="category in categories" :key="category.id" :value="category.id">{{ category.name }}</option></select></label>
         <label v-if="series.type === 'tag'" class="field"><span>Tag</span><select v-model="series.ref"><option v-for="tag in tags" :key="tag" :value="tag">{{ tag }}</option></select></label>
         <label v-if="series.type !== 'calculate'" class="field"><span>Measure</span><select v-model="series.measure"><option v-for="measure in MEASURES" :key="measure[0]" :value="measure[0]">{{ measure[1] }}</option></select></label>
@@ -69,7 +70,7 @@ async function remove() {
       </div>
       <fieldset v-if="series.type === 'accounts'" class="card" style="margin: 6px 0">
         <legend class="small">Accounts to add up ({{ series.refs.length }})</legend>
-        <label v-for="account in accounts" :key="account.id" class="check"><input type="checkbox" :checked="series.refs.includes(refOf(account))" @change="toggleRef(series, refOf(account))" />{{ account.name }}</label>
+        <label v-for="account in accounts" :key="account.id" class="check"><input type="checkbox" :checked="series.refs.includes(refOf(account))" @change="toggleRef(series, refOf(account))" />{{ account.name }} <span class="muted small">{{ categoryName(account, categories) }}</span></label>
       </fieldset>
       <div class="row"><label class="check small"><input v-model="series.hidden" type="checkbox" />Hidden (for formulas only)</label><button class="danger" @click="draft.series.splice(index, 1)">Remove</button></div>
     </div>

@@ -320,6 +320,9 @@ value(t) = replay(t) + base_real × (1 + g)^t × s(m) × (1 + i_category)^t  [+ 
       transactions, rule tests, the import preview) leads with the date as yyyy/mm/dd with the weekday greyed under
       it, then the description and its details, then the amount. On a phone the date and amount share the top line
       and the description and details go below. Long descriptions and details wrap onto the next line.
+- [C] Wherever accounts are listed they show their category: dropdowns group accounts under category headings (a
+      rule's account, Explore's Show, chart series, forecast generators); lists show it on the line under the name
+      (Analysis overview, rules, the forecast model and account settings, accounts ticked for a chart series).
 - [C] **Currencies:** a project has a default currency (NZD) and each account its own (the project's unless chosen);
       a datasource has the currency of its statements. Every transaction is shown with its account's currency (a
       datasource's own lists with the datasource's): dollar currencies with a prefix (NZ$, US$, A$, CA$, ...), others

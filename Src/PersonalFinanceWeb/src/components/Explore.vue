@@ -1,7 +1,7 @@
 <script setup>
 import { computed, inject, onMounted, ref, watch } from "vue";
 import { projectPath, toast } from "../state.js";
-import { formatMoney } from "../lib/format.js";
+import { accountsByCategory, formatMoney } from "../lib/format.js";
 import { colorFor } from "../lib/chart.js";
 import Icon from "./Icon.vue";
 import LineChart from "./LineChart.vue";
@@ -88,7 +88,7 @@ async function deleted() { editing.value = null; await loadCharts(); choice.valu
       <div class="row" style="flex-wrap: nowrap">
         <select v-model="choice" aria-label="Show" style="flex: 1; min-width: 0">
           <optgroup v-if="charts.length" label="Charts"><option v-for="chart in charts" :key="chart.id" :value="`chart:${chart.id}`">{{ chart.name }}</option></optgroup>
-          <optgroup label="Accounts"><option v-for="account in accounts" :key="account.id" :value="`account:${account.id}`">{{ account.name }}</option></optgroup>
+          <optgroup v-for="group in accountsByCategory(accounts, categories)" :key="group.category.id" :label="`Accounts: ${group.category.name}`"><option v-for="account in group.accounts" :key="account.id" :value="`account:${account.id}`">{{ account.name }}</option></optgroup>
         </select>
         <button class="icon" aria-label="Edit chart" title="Edit chart" :disabled="!savedChart" @click="editing = savedChart"><Icon name="edit" /></button>
         <button class="icon" aria-label="New chart" title="New chart" @click="editing = {}"><Icon name="plus" /></button>

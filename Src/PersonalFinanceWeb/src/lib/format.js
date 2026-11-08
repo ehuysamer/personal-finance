@@ -47,3 +47,14 @@ export function describeImport(result, { into } = {}) {
 // Transaction dates: yyyy/mm/dd, and the weekday shown under it.
 export function formatTxDate(text) { return text ? String(text).slice(0, 10).replaceAll("-", "/") : ""; }
 export function weekday(text) { return text ? new Date(`${String(text).slice(0, 10)}T00:00:00Z`).toLocaleDateString("en-NZ", { weekday: "long", timeZone: "UTC" }) : ""; }
+
+// Accounts with their categories: grouped under each category (in the project's order) for dropdowns, and a
+// category's name for a list line.
+export function accountsByCategory(accounts, categories = []) {
+  const groups = categories.map((category) => ({ category, accounts: accounts.filter((account) => account.category === category.id) }));
+  const known = new Set(categories.map((category) => category.id));
+  const other = accounts.filter((account) => !known.has(account.category));
+  if (other.length) groups.push({ category: { id: "", name: "No category" }, accounts: other });
+  return groups.filter((group) => group.accounts.length);
+}
+export function categoryName(account, categories = []) { return categories.find((category) => category.id === account?.category)?.name || ""; }

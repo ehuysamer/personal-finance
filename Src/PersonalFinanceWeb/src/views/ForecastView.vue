@@ -1,7 +1,7 @@
 <script setup>
 import { computed, inject, onMounted, ref, watch } from "vue";
 import { go, projectPath, state, toast } from "../state.js";
-import { describeFrequency, formatDate, formatMoney, formatPercent, isFrequency } from "../lib/format.js";
+import { accountsByCategory, categoryName, describeFrequency, formatDate, formatMoney, formatPercent, isFrequency } from "../lib/format.js";
 import Icon from "../components/Icon.vue";
 import Sheet from "../components/Sheet.vue";
 import Explore from "../components/Explore.vue";
@@ -39,6 +39,7 @@ onMounted(async () => { try { await loadList(); } catch (failure) { error.value 
 watch(current, loadCurrent, { immediate: true });
 
 const currencyOf = (id) => accounts.value.find((account) => account.id === id)?.currency || project.value?.currency || "NZD";
+const categoryOf = (id) => categoryName(accounts.value.find((account) => account.id === id), project.value?.categories);
 const accountName = (id) => accounts.value.find((account) => account.id === id)?.name || id;
 function blank() { return { name: "", frequency: "1m", horizon: { type: "duration", value: "10y" }, lookbackYears: 3, settings: { replay: true, seasonality: true, noise: false, maxGrowth: 0.25 }, inflation: {}, accounts: {}, generators: [] }; }
 // Inflation and growth are edited in percent; the API keeps fractions.
@@ -126,7 +127,7 @@ const models = computed(() => Object.entries(results.value?.model?.accounts || {
       <p class="small muted">What the forecast found per account at its last run: base (real money per month, today's prices), growth after inflation, recurring transactions it replays.</p>
       <ul class="list">
         <li v-for="item in models" :key="item.id" style="flex-wrap: wrap">
-          <div class="grow"><div class="title">{{ item.name }}</div><div class="sub">{{ item.method }} · base {{ formatMoney(item.base, currencyOf(item.id)) }}/month · growth {{ formatPercent(item.g) }} · inflation {{ formatPercent(item.inflation) }}<template v-if="item.seasonality"> · seasonal</template> · spread {{ formatMoney(item.sigma) }}</div>
+          <div class="grow"><div class="title">{{ item.name }}</div><div class="sub">{{ categoryOf(item.id) }} · {{ item.method }} · base {{ formatMoney(item.base, currencyOf(item.id)) }}/month · growth {{ formatPercent(item.g) }} · inflation {{ formatPercent(item.inflation) }}<template v-if="item.seasonality"> · seasonal</template> · spread {{ formatMoney(item.sigma) }}</div>
             <div v-for="recurring in item.recurring" :key="recurring.key" class="sub">↻ {{ recurring.description }}: {{ formatMoney(recurring.amount, currencyOf(item.id)) }} {{ recurring.cadence }}</div>
           </div>
         </li>
@@ -156,7 +157,7 @@ const models = computed(() => Object.entries(results.value?.model?.accounts || {
     <h3>Accounts</h3>
     <p class="small muted">Formula: the period's total. Names: value (model), replay, base, g, s, i, t (years ahead), age, and other accounts' short codes. Start and end: a date or "age 65".</p>
     <details v-for="row in draft.accountRows" :key="row.id" class="card">
-      <summary>{{ accountName(row.id) }} <span class="muted small">{{ row.method }}{{ row.formula ? " · formula" : "" }}</span></summary>
+      <summary>{{ accountName(row.id) }} <span class="muted small">{{ categoryOf(row.id) }} · {{ row.method }}{{ row.formula ? " · formula" : "" }}</span></summary>
       <div class="grid2">
         <label class="field"><span>Method</span><select v-model="row.method"><option v-for="method in METHODS" :key="method[0]" :value="method[0]">{{ method[1] }}</option></select></label>
         <label v-if="row.method === 'fixed'" class="field"><span>Amount per month</span><input v-model="row.value" type="number" step="0.01" /></label>
@@ -172,7 +173,7 @@ const models = computed(() => Object.entries(results.value?.model?.accounts || {
       <div class="grid2">
         <label class="field"><span>Name</span><input v-model="generator.name" /></label>
         <label class="field"><span>Type</span><select v-model="generator.type"><option v-for="type in GENERATORS" :key="type[0]" :value="type[0]">{{ type[1] }}</option></select></label>
-        <label class="field"><span>Account</span><select v-model="generator.account"><option v-for="account in accounts" :key="account.id" :value="account.id">{{ account.name }}</option></select></label>
+        <label class="field"><span>Account</span><select v-model="generator.account"><optgroup v-for="group in accountsByCategory(accounts, project?.categories)" :key="group.category.id" :label="group.category.name"><option v-for="account in group.accounts" :key="account.id" :value="account.id">{{ account.name }}</option></optgroup></select></label>
         <label v-if="!['minimum', 'maximum'].includes(generator.type)" class="field"><span>Frequency (empty: the forecast's)</span><input v-model="generator.frequency" placeholder="1m" /></label>
         <template v-if="generator.type === 'random'"><label class="field"><span>Min</span><input v-model.number="generator.min" type="number" /></label><label class="field"><span>Max</span><input v-model.number="generator.max" type="number" /></label></template>
         <template v-if="generator.type === 'sine'"><label class="field"><span>Amplitude</span><input v-model.number="generator.amplitude" type="number" /></label><label class="field"><span>Period (days)</span><input v-model.number="generator.periodDays" type="number" /></label><label class="field"><span>Phase (radians)</span><input v-model.number="generator.phase" type="number" step="0.1" /></label><label class="field"><span>Offset</span><input v-model.number="generator.offset" type="number" /></label></template>

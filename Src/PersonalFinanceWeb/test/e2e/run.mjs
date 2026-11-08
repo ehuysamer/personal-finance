@@ -126,6 +126,8 @@ try {
   await page.getByRole("button", { name: "Analyse" }).click();
   await page.getByText("Last analysed").waitFor({ timeout: 20000 });
   await page.getByText("15,000.00").waitFor();
+  // Account lists show each account's category.
+  await page.locator("li", { hasText: "Groceries" }).getByText(/^Food · 4 transactions/).waitFor();
   // Rent matched no rule: add one from the unmatched list (pre-filled), then analyse again.
   await page.getByRole("heading", { name: /Not matched by any rule 3/ }).waitFor();
   await page.getByRole("button", { name: "Add rule" }).first().click();

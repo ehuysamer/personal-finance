@@ -34,3 +34,11 @@ test("money with its currency: dollar prefixes, other currencies by code", async
   assert.equal(currencyLabel("AUD"), "A$");
   assert.equal(currencyLabel("GBP"), "GBP");
 });
+
+test("accounts grouped under their categories, in the project's order", async () => {
+  const { accountsByCategory, categoryName } = await import("../../src/lib/format.js");
+  const categories = [{ id: "income", name: "Income" }, { id: "food", name: "Food" }, { id: "home", name: "Home" }];
+  const accounts = [{ id: "g", name: "Groceries", category: "food" }, { id: "s", name: "Salary", category: "income" }, { id: "x", name: "Old", category: "gone" }];
+  assert.deepEqual(accountsByCategory(accounts, categories).map((group) => [group.category.name, group.accounts.map((a) => a.name)]), [["Income", ["Salary"]], ["Food", ["Groceries"]], ["No category", ["Old"]]]);
+  assert.equal(categoryName(accounts[0], categories), "Food");
+});
