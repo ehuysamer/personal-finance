@@ -108,7 +108,9 @@ export default function createForecastService({ store, indexService, workspaceSe
     const category = meta.categories.find((item) => item.id === account.category);
     const own = forecast.accounts[account.id] || forecast.accounts[account.shortCode] || {};
     const inflation = own.inflation ?? forecast.inflation[account.category] ?? category?.inflation ?? 0;
-    return { ...own, method: own.method || "replay+trend", inflation: Number(inflation) };
+    // Accounts in an ignored category are not forecast (unless the forecast sets their method).
+    const method = own.method || (category?.type === "ignore" ? "none" : "replay+trend");
+    return { ...own, method, inflation: Number(inflation) };
   }
 
   const handler = {

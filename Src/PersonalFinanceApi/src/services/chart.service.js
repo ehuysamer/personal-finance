@@ -3,7 +3,8 @@ import { BUCKETS, CHART_BUCKETS, MEASURES, aggregateFor, combineAggregates, peri
 import { evaluateExpression, expressionReferences, isLineName, parseExpression } from "../lib/chartExpression.js";
 
 export const SERIES_TYPES = ["account", "accounts", "category", "categories", "categoryTypes", "tag", "calculate"];
-export const CATEGORY_TYPES = ["income", "expense", "asset", "liability"];
+export { CATEGORY_TYPES } from "./workspace.service.js";
+import { CATEGORY_TYPES } from "./workspace.service.js";
 export const AXES = ["left", "right", "virtual"];
 
 // Charts: named per project; each series is an account (by short code or id), the sum of several accounts (refs), a

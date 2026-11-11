@@ -15,7 +15,7 @@ const MEASURES = [["running", "Running total"], ["sum", "Total"], ["count", "Cou
 const BUCKETS = [["daily", "Day"], ["weekly", "Week"], ["monthly", "Month"], ["quarterly", "Quarter"], ["yearly", "Year"]];
 const AXES = [["left", "Left axis"], ["right", "Right axis"], ["virtual", "Own scale (no axis)"]];
 const MULTI = ["accounts", "categories", "categoryTypes"];
-const TYPES = [["income", "Income"], ["expense", "Expenses"], ["asset", "Assets"], ["liability", "Liabilities"]];
+const TYPES = [["income", "Income"], ["expense", "Expenses"], ["asset", "Assets"], ["liability", "Liabilities"], ["ignore", "Ignored (transfers)"]];
 // The accounts a by-type or several-categories series adds up, shown under its tick boxes.
 function includedAccounts(series) {
   const ids = series.type === "categoryTypes" ? props.categories.filter((category) => series.refs.includes(category.type)).map((category) => category.id) : series.refs;

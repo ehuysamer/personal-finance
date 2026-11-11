@@ -148,3 +148,16 @@ td .weekday { color: var(--muted); font-size: .75rem; }
 /* A rule that is switched off: greyed. */
 .list > li.rule-row.disabled, .list > li.rule-row.disabled:hover { background: var(--off); color: var(--muted); }
 .list > li.rule-row.disabled .title { font-weight: 450; }
+/* Analysis overview: a category's heading with its total, coloured by type. */
+:root { --type-income: #067647; --type-expense: #b42318; --type-asset: #175cd3; --type-liability: #b54708; --type-ignore: #667085; }
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) { --type-income: #47cd89; --type-expense: #f97066; --type-asset: #84adff; --type-liability: #fdb022; --type-ignore: #98a2b3; } }
+:root[data-theme="dark"] { --type-income: #47cd89; --type-expense: #f97066; --type-asset: #84adff; --type-liability: #fdb022; --type-ignore: #98a2b3; }
+.summary-category { margin: 14px 0; }
+.summary-head { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; margin: 0 0 6px; padding-left: 10px; border-left: 4px solid var(--type-color, var(--border)); }
+.summary-head h3 { margin: 0; }
+.category-total { font-weight: 750; font-size: 1.05rem; color: var(--type-color, var(--text)); }
+.summary-category.type-income { --type-color: var(--type-income); }
+.summary-category.type-expense { --type-color: var(--type-expense); }
+.summary-category.type-asset { --type-color: var(--type-asset); }
+.summary-category.type-liability { --type-color: var(--type-liability); }
+.summary-category.type-ignore { --type-color: var(--type-ignore); opacity: .8; }

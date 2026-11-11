@@ -9,7 +9,7 @@ import Sheet from "./Sheet.vue";
 const props = defineProps({ modelValue: { type: String, default: "" }, categories: { type: Array, required: true }, label: { type: String, default: "Category" } });
 const emit = defineEmits(["update:modelValue", "created"]);
 const api = inject("api");
-const TYPES = ["income", "expense", "asset", "liability"];
+const TYPES = ["income", "expense", "asset", "liability", "ignore"];
 const draft = ref(null);
 const error = ref("");
 async function save() {

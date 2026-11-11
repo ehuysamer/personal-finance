@@ -81,6 +81,18 @@ function orphanRules(placed) {
 const categoryOf = (id) => categoryName(accounts.value.find((account) => account.id === id), project.value?.categories);
 const accountName = (id) => accounts.value.find((account) => account.id === id)?.name || id;
 const accountSummary = computed(() => (status.value?.accounts || []).map((item) => ({ ...item, name: accountName(item.id) })).sort((a, b) => Math.abs(b.running) - Math.abs(a.running)));
+// The overview by category (in the project's order; ignored categories last): each with its accounts and its total,
+// in the accounts' currency when they share one.
+const summaryByCategory = computed(() => {
+  const byId = new Map(accountSummary.value.map((item) => [item.id, item]));
+  const categories = [...(project.value?.categories || [])].sort((a, b) => (a.type === "ignore") - (b.type === "ignore"));
+  const groups = categories.map((category) => {
+    const items = accounts.value.filter((account) => account.category === category.id).map((account) => byId.get(account.id)).filter(Boolean).sort((a, b) => Math.abs(b.running) - Math.abs(a.running));
+    const currencies = [...new Set(items.map((item) => currencyOf(item.id)))];
+    return { category, items, total: Math.round(items.reduce((sum, item) => sum + (item.running || 0), 0) * 100) / 100, currency: currencies.length === 1 ? currencies[0] : null };
+  });
+  return groups.filter((group) => group.items.length);
+});
 
 function newRule() { addingAccount.value = false; ruleDraft.value = { name: "", account: "", enabled: true, conditions: [{ field: "description", op: "contains", value: "" }], date: { start: "", end: "" }, amount: { min: "", max: "" } }; testResult.value = null; }
 async function editRule(item) { addingAccount.value = false; const rule = await api.get(`${projectPath()}/rules/${item.id}`); ruleDraft.value = { ...rule, date: { start: rule.date.start || "", end: rule.date.end || "" }, amount: { min: rule.amount.min ?? "", max: rule.amount.max ?? "" }, conditions: rule.conditions.map((condition) => ({ ...condition, value: condition.values ? condition.values.join(", ") : condition.value })) }; testResult.value = null; }
@@ -122,13 +134,20 @@ async function moveRule(index, delta) {
       <JobProgress v-if="jobId" :job-id="jobId" @done="(job) => { jobId = null; jobDone(job); }" />
       <p v-if="status?.finishedAt" class="small muted">Last analysed {{ new Date(status.finishedAt).toLocaleString() }} · transactions up to {{ formatDate(status.lastDate) }}</p>
       <p v-for="warning in status?.warnings || []" :key="warning" class="small neg">{{ warning }}</p>
-      <ul class="list">
-        <li v-for="item in accountSummary" :key="item.id" class="link" @click="historyAccount = item.id; tab = 'explore'">
-          <div class="grow"><div class="title">{{ item.name }}</div><div class="sub">{{ categoryOf(item.id) }} · {{ item.count }} transactions<template v-if="item.first"> · {{ formatDate(item.first) }} – {{ formatDate(item.last) }}</template></div></div>
-          <div class="num" :class="{ neg: item.running < 0 }">{{ formatMoney(item.running, currencyOf(item.id)) }}</div>
-        </li>
-        <li v-if="!accountSummary.length" class="empty">Not analysed yet</li>
-      </ul>
+      <!-- Accounts under their categories; each category's total in bold, coloured by its type. -->
+      <section v-for="group in summaryByCategory" :key="group.category.id" class="summary-category" :class="`type-${group.category.type}`">
+        <div class="summary-head">
+          <h3>{{ group.category.name }} <span class="badge">{{ group.category.type === "ignore" ? "ignored" : group.category.type }}</span></h3>
+          <strong class="num category-total">{{ formatMoney(group.total, group.currency) }}</strong>
+        </div>
+        <ul class="list">
+          <li v-for="item in group.items" :key="item.id" class="link" @click="historyAccount = item.id; tab = 'explore'">
+            <div class="grow"><div class="title">{{ item.name }}</div><div class="sub">{{ item.count }} transactions<template v-if="item.first"> · {{ formatDate(item.first) }} – {{ formatDate(item.last) }}</template></div></div>
+            <div class="num" :class="{ neg: item.running < 0 }">{{ formatMoney(item.running, currencyOf(item.id)) }}</div>
+          </li>
+        </ul>
+      </section>
+      <ul v-if="!accountSummary.length" class="list"><li class="empty">Not analysed yet</li></ul>
       <template v-if="status?.finishedAt">
         <div class="spread"><h2>Not matched by any rule <span class="badge">{{ unmatchedCount }}</span></h2><button v-if="rulesChanged" class="primary" :disabled="!!jobId" @click="analyse"><Icon name="play" /> Analyse again</button></div>
         <p class="muted small">These went to Uncategorised. Add a rule to put them (and others like them) into an account.</p>

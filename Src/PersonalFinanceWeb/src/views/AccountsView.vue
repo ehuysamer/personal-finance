@@ -14,7 +14,7 @@ const accounts = ref([]);
 const error = ref("");
 const projectDraft = ref(null);
 const accountDraft = ref(null);
-const TYPES = ["income", "expense", "asset", "liability"];
+const TYPES = ["income", "expense", "asset", "liability", "ignore"];
 
 async function load() {
   error.value = "";

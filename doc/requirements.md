@@ -163,7 +163,10 @@ $tenants/{tenant}.json                      tenant and members
       its inflation override; the last category cannot be deleted). They stay on the project. Wherever a category is
       chosen (adding an account, here or from a rule), a **+** next to the dropdown opens a **New category** pop-up.
 - [C] A project has a list of **categories** (e.g. Income, Housing, Food, Transport), each with a type
-      `income` | `expense` | `asset` | `liability` and a default inflation rate for forecasting.
+      `income` | `expense` | `asset` | `liability` | `ignore` and a default inflation rate for forecasting. **Ignore**
+      is for money that is neither income nor spending (transfers between own accounts, card repayments): its
+      transactions still go into accounts (so they are not unmatched), forecasts leave those accounts out (unless a
+      forecast sets their method), and charts include them only when chosen.
 - [C] Accounts within a project: add / edit / delete; `name`, optional **short code** (unique in the project,
       letters, digits and `_`, used in charts and formulas), one **category**, **tags**, `description`.
       Deleting an account in use by rules or charts warns and lists them.
@@ -200,6 +203,9 @@ $tenants/{tenant}.json                      tenant and members
 
 - [C] **Analyse** reads the project's datasources (imported and manual rows, totals), applies the rules, and writes
       each account's transactions and aggregates. It rebuilds from scratch each time, so it is repeatable.
+- [C] The Analysis overview lists the accounts under their categories (in the project's order, ignored ones last);
+      each category's heading shows its total in bold, coloured by its type (income green, expense red, asset blue,
+      liability orange, ignore grey).
 - [C] Each account gets per-transaction running totals, and **monthly, quarterly and yearly** aggregates: sum,
       running total, count, average, minimum, maximum. Category totals are aggregated the same way. These are
       built in the same pass as the transactions.

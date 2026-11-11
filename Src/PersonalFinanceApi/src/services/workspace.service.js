@@ -3,7 +3,9 @@ import { DEFAULT_CURRENCY, currencyCode } from "../lib/currency.js";
 import { assertId, keys, timestamp, uniqueId } from "../lib/keys.js";
 import { getJson, putJson, softDelete, updateJson } from "../lib/json.js";
 
-export const CATEGORY_TYPES = ["income", "expense", "asset", "liability"];
+// "ignore": money that is neither income nor spending (transfers between own accounts, card repayments): its
+// transactions still go into accounts, but forecasts leave those accounts out.
+export const CATEGORY_TYPES = ["income", "expense", "asset", "liability", "ignore"];
 const DEFAULT_CATEGORIES = [
   { id: "income", name: "Income", type: "income", inflation: 0.03 },
   { id: "housing", name: "Housing", type: "expense", inflation: 0.04 },

@@ -387,3 +387,36 @@ test("chart series: several categories, or every category of some types (e.g. al
   await api.call("DELETE", `${P}/categories/transport?moveTo=other`);
   assert.deepEqual((await api.call("GET", `${P}/charts/net-worth`)).body.series[0].refs, ["other", "food"]);
 });
+
+test("an ignored category: analysed like any other, left out of forecasts", async (t) => {
+  const api = await startTestApi();
+  t.after(() => api.close());
+  const tenant = (await api.call("GET", "/v1/me")).body.tenants[0].id;
+  const T = `/v1/tenants/${tenant}`;
+  const ds = (await api.call("POST", `${T}/datasources`, { name: "Bank" })).body;
+  for (const month of ["01", "02", "03", "04"]) {
+    await api.call("POST", `${T}/datasources/${ds.id}/manual-transactions`, { date: `2026-${month}-05`, account: "A", description: "Transfer to savings", amount: -500 });
+    await api.call("POST", `${T}/datasources/${ds.id}/manual-transactions`, { date: `2026-${month}-10`, account: "A", description: "Salary", amount: 3000 });
+  }
+  const project = (await api.call("POST", `${T}/projects`, { name: "Home", datasources: [ds.id] })).body;
+  const P = `${T}/projects/${project.id}`;
+  const category = await api.call("POST", `${P}/categories`, { name: "Transfers", type: "ignore" });
+  assert.equal(category.status, 201, JSON.stringify(category.body));
+  assert.equal((await api.call("POST", `${P}/categories`, { name: "Bad", type: "savings" })).status, 400);
+  const transfers = (await api.call("POST", `${P}/accounts`, { name: "Transfers", category: "transfers" })).body;
+  const salary = (await api.call("POST", `${P}/accounts`, { name: "Salary", category: "income" })).body;
+  await api.call("POST", `${P}/rules`, { name: "Transfers", account: transfers.id, conditions: [{ field: "description", op: "startswith", value: "Transfer" }] });
+  await api.call("POST", `${P}/rules`, { name: "Salary", account: salary.id, conditions: [{ field: "description", op: "exact", value: "Salary" }] });
+  await api.call("POST", `${P}/analysis`);
+  await api.drain();
+  assert.equal((await api.call("GET", `${P}/accounts/${transfers.id}/transactions`)).body.total, 4, "analysed (not unmatched)");
+  assert.equal((await api.call("GET", `${P}/unmatched`)).body.total, 0);
+  const forecast = (await api.call("POST", `${P}/forecasts`, { name: "Base", horizon: { type: "duration", value: "6m" } })).body;
+  await api.call("POST", `${P}/forecasts/${forecast.id}/run`);
+  await api.drain();
+  const ignored = await api.call("GET", `${P}/accounts/${transfers.id}/transactions?forecast=${forecast.id}`);
+  const forecastSalary = await api.call("GET", `${P}/accounts/${salary.id}/transactions?forecast=${forecast.id}`);
+  assert.deepEqual([ignored.body.total > 0, forecastSalary.body.total > 0], [false, true], "the ignored account is not forecast");
+  const chart = await api.call("POST", `${P}/chart-data`, { chart: { name: "x", series: [{ name: "IGN", type: "categoryTypes", refs: ["ignore"], measure: "sum" }] } });
+  assert.deepEqual(chart.body.series[0].actual, [-500, -500, -500, -500], "charts include ignored categories only when chosen");
+});
